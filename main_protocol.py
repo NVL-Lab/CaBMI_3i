@@ -1,5 +1,3 @@
-#!/opt/homebrew/Caskroom/miniconda/base/envs/llopis-data-collection/bin/python
-
 author_= 'Saul Gurgua Lopez'
 
 import os
@@ -67,10 +65,10 @@ if __name__ == '__main__':
     '''
 
     #HERE
-    mask_intermediate = im_find_cells(im_bg, tset).
-    init_roi_mask = bwlabel(mask_intermediate);
-    find_center (init_roi_mask, im_bg);
-    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, tset.im.chan_data);    
+    mask_intermediate = im_find_cells(im_bg, tset)
+    init_roi_mask = bwlabel(mask_intermediate)
+    find_center (init_roi_mask, im_bg)
+    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, tset.im.chan_data)    
 
     # Delete ROI if needed
     print('Deleting ROIs from image!')

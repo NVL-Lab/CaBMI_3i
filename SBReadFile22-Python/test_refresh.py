@@ -7,6 +7,7 @@ import numpy as np
 import sys, getopt
 import time
 
+import random
 
 def print_usage():
     print ('usage:\npython ',os.path.basename(__file__),' -s sldy_file [-i image_number] [-c channel_number] [-p plot_interval]')
@@ -136,14 +137,24 @@ def main(argv):
                 #print ("*** The read buffer len is: " , len(image))
                 #calculate mean intensity using numpy
                 theMean = np.mean(image)
+               
+                '''
+                Access random cell amount (16x16)
+                '''
+                start_row = random.randint(0, theNumRows - 16)
+                start_col = random.randint(0, theNumColumns - 16)
+                sub_image = image[start_row:start_row + 16, start_col:start_col + 16]
+                theSubMean = np.mean(sub_image)
+                
                 print ("*** theTimepoint: " , theTimepoint, "The mean: ",theMean)
+                print ("Sub-image shape: ", sub_image.shape, " The mean of sub matrix: ",theSubMean)
                 if theMean==0:
                     #streaming has missed a timepoint
                     #insert a break here
                     print ("****** Mean is 0 ****** ")
 
                 #plot the slice every n timepoints
-                if theTimepoint%thePlotFrequency==5: # For now
+                if theTimepoint%thePlotFrequency==999: # For now
                     if theTimepoint == 0:
                         img_artist = plt.imshow(image)
                     else:
@@ -160,7 +171,7 @@ def main(argv):
                 et = time.time()
                 elapsed_time = et - st - theTimePaused
                 total_time_elapsed.append(elapsed_time)
-                print(f"****** Time is {elapsed_time} ******")
+                print(f"****** Time is {elapsed_time} ******\n")
 
             # see if there are any new timepoints
             theSBFileReader.Refresh(theCapture)

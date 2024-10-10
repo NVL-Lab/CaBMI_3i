@@ -67,6 +67,8 @@ class DataLoader(object):
             # and release the lock when done
             # probably this can be done with open(theLockFilePath,'x') and looping until it succeed
             theImageTitles = self.mFile.GetListOfImageGroupTitles()
+            print(theImageTitles)
+
             theImageGroupIndex = 0
             for theImageTitle in  theImageTitles:
                 theImageGroup = CImageGroup(self.mFile,theImageTitle)

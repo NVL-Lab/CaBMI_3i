@@ -1,52 +1,93 @@
 author_= 'Saul Gurgua Lopez'
 
 import os
+from pathlib import Path
+import numpy as np
+from scipy.io import savemat #maybe change to save numpy
+from scipy.ndimage import label
+import matplotlib.pyplot as plt
+from scipy.io import loadmat
 #from pyfirmata import Arduino, util
 
-from save_path import get_path
+from save_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
+from segmentation.im_find_cells_tm import im_find_cells_tm
+from rois.get_center import get_center
+from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
+from rois.delete_roi_2chan import delete_roi_2chan
+from rois.draw_roi_g_chan import draw_roi_g_chan
+from baseline_acqnvs_3i import baseline_acqnvs_3i
+from plots.plot_neurons_baseline import plot_neurons_baseline
+from plots.plot_neurons_ensemble import plot_neurons_ensemble
+from rois.select_roi_data import select_roi_data
+from calibration.baseline2target import baseline2target
 
 # Line 373 to get the BMIAcqn function    
 if __name__ == '__main__':
+    path_data = {}
+
     tset = get_bmi_settings()
     fbset = get_fb_settings()
 
     # board = Arduino('COM3')
+    # How will audio be heard?
 
-    ps = get_path() # Path Sections
-    save_path = os.path.join(ps['disk'], ps['folder'], ps['animal'], ps['date'], ps['day'], 'images') 
-    
-    if not os.path.exists(save_path):
-        #os.makedirs(dir_path)
-        print(f"Directory '{save_path}' created.")
+    exp_info = get_exp_info()
+    save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
+    if save_path.exists():
+        print(f'{save_path} exists.')
     else:
-        print(f"Directory '{save_path}' already exists.")
-    
+        print(f'{save_path} does not exist.')
+
+    path_data['baseline_env'] = tset['baseline_env']
+    path_data['bmi_env'] = tset['bmi_env']
+    path_data['save_path'] = save_path
+    path_data['im'] = save_path / 'im'
+    print(path_data)
+
     # Get pixel values from 3i
-    '''
+    """
     pl = actxserver('PrairieLink.Application');
     pl.Connect(); 
     disp('Connecting to prairie...');
-    '''
+    """
 
     # Prairie variables
-    '''
+    """
     px = pl.PixelsPerLine(); % px = 512;
     py = pl.LinesPerFrame(); % py = 512;
     micronsPerPixel.x = str2double(pl.GetState('micronsPerPixel', 'XAxis')); 
     micronsPerPixel.y = str2double(pl.GetState('micronsPerPixel', 'YAxis')); 
-    '''
+    pl.Disconnect();
+    disp('Disconnected from prairie');
+    """
+
+    chan_num = len(tset['im']['chan_data'])
 
     # May not be necessary
     # Get first image to obtain rois
-    #im_summary  = pl.GetImage_2(2, px, py);
-    scale_im_interactive(im_summary)
-    '''
+    """
+    pl = actxserver('PrairieLink.Application');
+    pl.Connect();
+    disp('Connecting to prairie')
+    pause(2);    
+    ** im_summary  = pl.GetImage_2(2, px, py); #2 is a channel
     pl.Disconnect();
-    disp('Disconnected from prairie');
-    chan_num = length(tset['im']['chan_data']);
-    '''
+    """
+
+    # Scale image to see ROIs better
+    """
+    im_scale_ops = {'im': [],
+                    'minmax_perc': [],
+                    'minmax': [],
+                    'min': [],
+                    'min_perc': [],
+                    'max': [],
+                    'max_perc': []}
+    im_scale_info = scale_im_interactive(im_summary, im_scale_ops ,0)
+    """
+
     # Each channel is green and red
     # im_bg is roi_data file    
 
@@ -64,11 +105,30 @@ if __name__ == '__main__':
     plot_images(2).label = 'scaled';
     '''
 
-    #HERE
-    mask_intermediate = im_find_cells(im_bg, tset)
-    init_roi_mask = bwlabel(mask_intermediate)
-    find_center (init_roi_mask, im_bg)
+    mask_intermediate = im_find_cells_tm(im_bg, tset)
+    init_roi_mask = label(mask_intermediate)
+    get_center(init_roi_mask, im_bg)
     roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, tset.im.chan_data)    
+
+    # Visualize
+    # get() is from matlab and may be simulated in python with tkinter
+    """
+    screen_size = get(0,'ScreenSize');
+    h = figure('Position', [screen_size(3)/2 1 screen_size(3)/2 screen_size(4)]);
+    hold on;
+    imagesc(roi_data.im_roi); %colormap('gray');  
+    axis square;
+    title('ROI footprint overlay in blue'); 
+    % scatter(roi_data.x, roi_data.y, pi*roi_data.r.^2, 'r'); 
+
+    %
+    h = figure('Position', [screen_size(3)/2 1 screen_size(3)/2 screen_size(4)]);
+    % hold on;
+    imagesc(roi_data.roi_mask); %colormap('gray');  
+    axis square;
+    title('ROI Mask'); 
+    % scatter(roi_data.x, roi_data.y, pi*roi_data.r.^2, 'r');
+    """
 
     # Delete ROI if needed
     print('Deleting ROIs from image!')
@@ -98,24 +158,26 @@ if __name__ == '__main__':
 
     # Save roi_data
     roi_data_file = os.path.join(save_path, 'roi_data.mat')
-    scipy.io.savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
+    savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
 
     # Baseline acquisition
-    base_path, base_activity = baseline_acqnvs_3i(path_data, roi_data.roi_mask, tset, a, fbset.arduino.pin)
-    #load(base_path); 
+    base_mat_path = baseline_acqnvs_3i(path_data, roi_data.roi_mask, tset, a, fbset.arduino.pin)
+    base_mat = loadmat(base_mat_path)[0][0];
 
     # Plot neurons from baseline
-    plot_neuron_baseline(base_activity, [], [], np.max(roi_data['num_rois']))
+    plot_neurons_baseline(base_mat['base_activity'], [], [], np.max(roi_data['num_rois']))
     e1_base = sorted([11, 12])
     e2_base = sorted([4, 13])
 
     ensemble_neurons = e1_base + e2_base
-    plot_neurons_ensemble(base_activity, ensemble_neurons, [1] * len(e1_base) + [2] * len(e2_base))
+    plot_neurons_ensemble(base_mat['base_activity'], ensemble_neurons, [1] * len(e1_base) + [2] * len(e2_base))
     select_roi_data(roi_data, list(set(e2_base) | set(e1_base)))
 
-
-    data = load(n_f_file)
-    num_base_samples = np.sum(~np.isnan(base_activity[0, :]))
+    # Assumining this will be a loadmat type file
+    # Check is base_mat exists (renamed from base_file) - logic matfile line 280
+    n_f_file = base_mat_path;
+    ndata = loadmat(base_mat_path)[0][0];
+    num_base_samples = np.sum(~np.isnan(ndata['base_activity'][0, :]))
     baseline_frame_rate = num_base_samples / (15 * 60)
     
     sec_per_reward_range = np.array([120, 90])
@@ -139,6 +201,7 @@ if __name__ == '__main__':
     experiment_length = 30 * 60 * tset['im']['frame_rate']
 
     # Generate vector_stim and ISI
+    #STOPPED HERE
     vector_stim, isi = get_random_stim(tset['im']['frameRate'], experiment_length, tset['rs']['IHSImean'], tset['rs']['IHSIrange'], False)
 
     # Set the seed for baseline
@@ -165,7 +228,7 @@ if __name__ == '__main__':
     if fbset['fb_bool']:
         fb_freq_i = 7000
         fbset['arduino']['duration'] = 1
-        playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration'])
+        playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration']) # This will be changed and will use the MiceBall/RATBALL code, which has tone code
 
     # Set up base_val_seed for the BMI experiment
     base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan

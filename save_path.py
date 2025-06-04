@@ -1,7 +1,6 @@
-def get_path() -> dict:
+def get_exp_info() -> dict:
     return {
-        'disk': '~',
-        'folder': 'Downloads',
+        'folder': '~/Downloads',
         'animal': 'ago23', 
         'day': 'DF',
         'date': '230423',

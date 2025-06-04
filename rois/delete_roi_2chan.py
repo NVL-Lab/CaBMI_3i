@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from roi_data2chan import roi_data2chan
 
-def delete_roi2chan(plot_images, roi_data) -> list:
+def delete_roi_2chan(plot_images, roi_data) -> list:
     """
     Function to delete ROIs from the image.
     """

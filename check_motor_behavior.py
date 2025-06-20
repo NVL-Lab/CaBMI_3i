@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import pywin32 as win32
+from save_files_3i import save_files_3i
 
 def check_motor_behavior(a, path_data, tset, expt_str, apin):
     """
@@ -34,7 +35,7 @@ def check_motor_behavior(a, path_data, tset, expt_str, apin):
     pl.SendScriptCommands(load_command)
 
     # Set the path where to store the imaging data
-    save_prairie_files(path_data['savePath'], pl, expt_str)
+    save_files_3i(path_data['savePath'], pl, expt_str)
 
     # Prepare the Arduino
     # Give random reward to trigger the jetball

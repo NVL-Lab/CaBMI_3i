@@ -18,7 +18,7 @@ def get_random_stim(frame_rate, experiment_length, ihsi_mean, ihsi_range, plot=F
     """
     
     # Calculate the average stimulus period and ISI range in frames
-    average_stim_eriod = ihsi_mean * frame_rate
+    average_stim_period = ihsi_mean * frame_rate
     range_ = ihsi_range * frame_rate
     
     # Calculate the number of stimuli

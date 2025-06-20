@@ -1,7 +1,8 @@
 author_= 'Saul Gurgua Lopez'
 
-import os
 from pathlib import Path
+
+import os
 import numpy as np
 from scipy.io import savemat #maybe change to save numpy
 from scipy.ndimage import label
@@ -9,106 +10,88 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat
 #from pyfirmata import Arduino, util
 
-from save_path import get_exp_info
+from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
-from segmentation.im_find_cells_tm import im_find_cells_tm
+from SBReadFile22.SBReadFile import *
+from rois.scale_im_interactive import scale_im_interactive
+
+#from segmentation.im_find_cells_tm import im_find_cells_tm
 from rois.get_center import get_center
-from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
-from rois.delete_roi_2chan import delete_roi_2chan
-from rois.draw_roi_g_chan import draw_roi_g_chan
-from baseline_acqnvs_3i import baseline_acqnvs_3i
+#from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
+#from rois.delete_roi_2chan import delete_roi_2chan
+#from rois.draw_roi_g_chan import draw_roi_g_chan
+#from baseline_acqnvs_3i import baseline_acqnvs_3i
 from plots.plot_neurons_baseline import plot_neurons_baseline
 from plots.plot_neurons_ensemble import plot_neurons_ensemble
 from rois.select_roi_data import select_roi_data
 from calibration.baseline2target import baseline2target
+from params.create_vector_random_stim import get_random_stim
 
-# Line 373 to get the BMIAcqn function    
+#import bmi_acqnvs_3i
+
 if __name__ == '__main__':
-    path_data = {}
-
-    tset = get_bmi_settings()
-    fbset = get_fb_settings()
-
-    # board = Arduino('COM3')
-    # How will audio be heard?
-
     exp_info = get_exp_info()
     save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
-    if save_path.exists():
-        print(f'{save_path} exists.')
-    else:
-        print(f'{save_path} does not exist.')
+    #save_path.mkdir(parents=True, exist_ok=True)
 
-    path_data['baseline_env'] = tset['baseline_env']
-    path_data['bmi_env'] = tset['bmi_env']
-    path_data['save_path'] = save_path
-    path_data['im'] = save_path / 'im'
+    fb_set = get_fb_settings()
+    task_set = get_bmi_settings()
+    path_data = {
+        'baseline_env': task_set['baseline_env'],
+        'bmi_env': task_set['bmi_env'],
+        'save_path': save_path,
+        'im': save_path / 'im'
+    }
     print(path_data)
 
-    # Get pixel values from 3i
-    """
-    pl = actxserver('PrairieLink.Application');
-    pl.Connect(); 
-    disp('Connecting to prairie...');
-    """
+    SBFileReader = SBReadFile()
+    if not SBFileReader.Open('/Users/saulglopez/Downloads/Slide3-testing.sldy'):
+        print('.sldy file not found')
+        exit(1)
 
-    # Prairie variables
-    """
-    px = pl.PixelsPerLine(); % px = 512;
-    py = pl.LinesPerFrame(); % py = 512;
-    micronsPerPixel.x = str2double(pl.GetState('micronsPerPixel', 'XAxis')); 
-    micronsPerPixel.y = str2double(pl.GetState('micronsPerPixel', 'YAxis')); 
-    pl.Disconnect();
-    disp('Disconnected from prairie');
-    """
+    '''
+    print(SBFileReader.GetNumCaptures())
+    print(SBFileReader.GetNumXColumns(0))
+    print(SBFileReader.GetNumYRows(0))
+    print(SBFileReader.GetNumChannels(0))
+    print(SBFileReader.GetChannelName(0,1))
+    print(SBFileReader.GetAuxSerializedData(0,0,0))
+    '''
 
-    chan_num = len(tset['im']['chan_data'])
-
-    # May not be necessary
-    # Get first image to obtain rois
-    """
-    pl = actxserver('PrairieLink.Application');
-    pl.Connect();
-    disp('Connecting to prairie')
-    pause(2);    
-    ** im_summary  = pl.GetImage_2(2, px, py); #2 is a channel
-    pl.Disconnect();
-    """
+    # Get first image to obtain rois (could be different live stream)
+    im_summary = SBFileReader.ReadImagePlaneBuf(0,0,0,0,0,True)
 
     # Scale image to see ROIs better
-    """
-    im_scale_ops = {'im': [],
-                    'minmax_perc': [],
-                    'minmax': [],
-                    'min': [],
-                    'min_perc': [],
-                    'max': [],
-                    'max_perc': []}
-    im_scale_info = scale_im_interactive(im_summary, im_scale_ops ,0)
-    """
-
-    # Each channel is green and red
-    # im_bg is roi_data file    
+    '''
+        Why save them all?
+        num_im_sc will not be used
+        only necessary paramater is im_summary
+    '''
+    im_sc_struct, _ = scale_im_interactive(im_summary, [],0)
 
     # ROI Visualization
-    '''
-    im_bg = im_sc_struct(end).im;
-    h = figure;
-    imagesc(im_bg), colormap bone, caxis([-0 nanmean(nanmean(im_bg(:)))*4])
-    axis square
-    title('selected background image for identifying tseROI');
-    plot_images = struct('im', [], 'label', '');
-    plot_images(1).im = im_summary;
-    plot_images(1).label = 'green mean';
-    plot_images(2).im = im_bg;
-    plot_images(2).label = 'scaled';
-    '''
+    im_bg = im_sc_struct[-1]['im']
+    plt.figure()
+    plt.imshow(im_bg, cmap='bone', vmin=0, vmax=4 * np.nanmean(im_bg)) # why the nanmean
+    plt.title('Background for tseROI Identification')
+    plt.show()
 
-    mask_intermediate = im_find_cells_tm(im_bg, tset)
+    # PLOT_IMAGES data
+    # 'plot_images' contains a set of images so user can tell if ROI selection is appropriate
+    plot_images = [{'im': None, 'label': ''} for _ in range(2)]
+    plot_images[0]['im'] = im_summary # check if it's the same as im_bg
+    plot_images[0]['label'] = 'green mean'
+    plot_images[1]['im'] = im_bg
+    plot_images[1]['label'] = 'scaled'
+
+    print(plot_images)
+    exit()
+
+    mask_intermediate = im_find_cells_tm(im_bg, task_set)
     init_roi_mask = label(mask_intermediate)
     get_center(init_roi_mask, im_bg)
-    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, tset.im.chan_data)    
+    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, task_set.im.chan_data)
 
     # Visualize
     # get() is from matlab and may be simulated in python with tkinter
@@ -161,7 +144,7 @@ if __name__ == '__main__':
     savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
 
     # Baseline acquisition
-    base_mat_path = baseline_acqnvs_3i(path_data, roi_data.roi_mask, tset, a, fbset.arduino.pin)
+    base_mat_path = baseline_acqnvs_3i(path_data, roi_data.roi_mask, task_set, a, fb_set.arduino.pin)
     base_mat = loadmat(base_mat_path)[0][0];
 
     # Plot neurons from baseline
@@ -195,19 +178,18 @@ if __name__ == '__main__':
     # Calculate reward per frame range
     reward_per_frame_range = 1. / frames_per_reward_range
 
-    target_info_path, target_cal_all_path, fb_cal = baseline2target(n_f_file, roi_data_file, e1_base, e2_base, frames_per_reward_range, tset, save_path, fbset)
+    target_info_path, target_cal_all_path, fb_cal = baseline2target(n_f_file, roi_data_file, e1_base, e2_base, frames_per_reward_range, task_set, save_path, fb_set)
 
     # Define the experiment length based on frame rate
-    experiment_length = 30 * 60 * tset['im']['frame_rate']
+    experiment_length = 30 * 60 * task_set['im']['frame_rate']
 
     # Generate vector_stim and ISI
-    #STOPPED HERE
-    vector_stim, isi = get_random_stim(tset['im']['frameRate'], experiment_length, tset['rs']['IHSImean'], tset['rs']['IHSIrange'], False)
+    vector_stim, isi = get_random_stim(task_set['im']['frameRate'], experiment_length, task_set['rs']['IHSImean'], task_set['rs']['IHSIrange'], False)
 
     # Set the seed for baseline
     seedBase = 0
     if not seedBase:
-        vector_stim += tset.f0_win
+        vector_stim += task_set.f0_win
 
     # Run BMI (Brain-Machine Interface) Experiment
     # --------------------------------------------------
@@ -216,19 +198,20 @@ if __name__ == '__main__':
     # Optionally load base_val_seed from previous BMI
 
     # Example of loading pretraining data
-    pretrain_file = 'BMI_online190524T131817.npy'
-    pretrain_data = np.load(os.path.join(savePath, pretrain_file), allow_pickle=True).item()
+    #pretrain_file = 'BMI_online190524T131817.npy'
+    #pretrain_data = np.load(os.path.join(savePath, pretrain_file), allow_pickle=True).item()
 
     # Handle pretrain_base and base_val_seed
-    pretrain_base = pretrain_data['baseVector']
-    pretrain_base = pretrain_base[:, ~np.isnan(pretrain_base[0, :])]
-    base_val_seed = pretrain_base[:, -1] if pretrain_base.size > 0 else None
+    #pretrain_base = pretrain_data['baseVector']
+    #pretrain_base = pretrain_base[:, ~np.isnan(pretrain_base[0, :])]
+    #base_val_seed = pretrain_base[:, -1] if pretrain_base.size > 0 else None
 
     # Test Feedback (FB)
-    if fbset['fb_bool']:
+    if fb_set['fb_bool']:
         fb_freq_i = 7000
-        fbset['arduino']['duration'] = 1
-        playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration']) # This will be changed and will use the MiceBall/RATBALL code, which has tone code
+        fb_set['arduino']['duration'] = 1
+        # This will be implemented from computer
+        #playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration']) # This will be changed and will use the MiceBall/RATBALL code, which has tone code
 
     # Set up base_val_seed for the BMI experiment
     base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan
@@ -238,11 +221,12 @@ if __name__ == '__main__':
     plt.imshow(im_bg)
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_acqnvs_3i(path_data, expt_str, target_info_path, tset, vector_stim, 0, [], base_val_seed, fbset['fb_bool'], fb_cal, a)
+    bmi_acqnvs_3i(path_data, expt_str, target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal, a)
 
     # D0:
     # 1) Save the workspace in folder
     # 2) Save this protocol script in the folder (savePath)
 
     # If motor behavior experiment, run this
-    check_motor_behavior(a, path_data, tset, expt_str, fbset['arduino']['pin'])
+    #STOPPED HERE
+    check_motor_behavior(a, path_data, task_set, expt_str, fb_set['arduino']['pin'])

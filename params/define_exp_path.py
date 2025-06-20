@@ -1,0 +1,8 @@
+def get_exp_info() -> dict:
+    return {
+        'folder': '~/Downloads',
+        'animal': 'ago23', 
+        'day': 'DF',
+        'date': '230423',
+        'expt_str': 'BMI_stim' # ['BMI_stim', 'RandomDRstim', 'RandomDRstim', 'no_stim', 'BMI_no_stim_water', 'BMI_stim_water', 'BMI_random_stim_water', 'Behavior']
+    }

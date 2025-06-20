@@ -87,6 +87,11 @@ if __name__ == '__main__':
 
     print(plot_images)
     exit()
+    # we may want 10 hits per 5 min (every 60 to 90 sec)
+    # show more of a range of hits for cursor
+    # A T = 0.3 or 0.4 (OR 3 or 4) (we want 0.5 to 1) might be noise so we wouldn't want that
+    # Want a Gaussian distribtuion of T, if not a bit flatter overall
+    # Calibration may be wrong if no hits happen in the first 5 min
 
     mask_intermediate = im_find_cells_tm(im_bg, task_set)
     init_roi_mask = label(mask_intermediate)

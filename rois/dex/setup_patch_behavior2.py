@@ -3,11 +3,11 @@ from matplotlib.patches import Polygon
 import numpy as np
 from matplotlib.widgets import PolygonSelector
 from skimage.draw import polygon2mask
-from get_ud import get_ud
+from .get_ud import get_ud
 
-from set_ud import set_ud
-from get_current_point import get_current_point
-from catch_mouse_drag import catch_mouse_drag
+from .set_ud import set_ud
+from .get_current_point import get_current_point
+from .catch_mouse_drag import catch_mouse_drag
 
 def setup_patch_behavior2(h_pin_list, f_refresh_roi_traces):
     for h_pin in h_pin_list:

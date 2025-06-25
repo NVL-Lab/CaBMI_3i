@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from catch_mouse_drag import catch_mouse_drag
-from setup_patch_behavior2 import setup_patch_behavior2
+from .catch_mouse_drag import catch_mouse_drag
+from .setup_patch_behavior2 import setup_patch_behavior2
 
 """
     This is an interpretation of drawROIs2.m

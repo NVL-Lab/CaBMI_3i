@@ -1,14 +1,13 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter, label
 from skimage.morphology import disk, binary_dilation
-from im_filter2 import im_filter2
-from dog_n import dog_n
-from dog_n2 import dog_n2
-from im_dilate2 import im_dilate2
+from .im_filter2 import im_filter2
+from .dog_n import dog_n
+from .dog_n2 import dog_n2
+from .im_dilate2 import im_dilate2
 
 def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemode=0, temmode=1):
     """
-    Python version of imFindCellsTM from MATLAB.
     Template matching based cell segmentation.
 
     Parameters:
@@ -29,25 +28,38 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     img = img.astype(float)
 
     # === High-pass filtering ===
-    hp_filter = gaussian_filter(img, sigma=template_diam)
+    print('applying gaussian filter...')
+    #hp_filter = gaussian_filter(img, sigma=template_diam)
+    def gaussian_kernel(size, sigma):
+        """Creates a 2D Gaussian kernel."""
+        x = np.linspace(- (size // 2), size // 2, size)
+        y = np.linspace(- (size // 2), size // 2, size)
+        x, y = np.meshgrid(x, y)
+        kernel = np.exp(-(x ** 2 + y ** 2) / (2 * sigma ** 2))
+        kernel /= kernel.sum()  # Normalize
+        return kernel
+
+    kernel_size = int(np.ceil(template_diam * 5))
+    hp_filter = gaussian_kernel(kernel_size, template_diam)
 
     # ⛔️ Custom function
     filtered = im_filter2(hp_filter, img)
     hp_img = img / filtered  # Placeholder
 
     # === Template Matching ===
-    print("template matching....")
+    print('template matching...')
 
     # ⛔️ Custom function
     if temmode == 1:
-        raise NotImplementedError("DOG_N2 is not defined. Please provide its implementation.")
+        print('running dog_n2...')
         template = dog_n2(template_diam / 2)
     else:
-        raise NotImplementedError("DOG_N is not defined. Please provide its implementation.")
+        print('running dog_n...')
         template = dog_n(template_diam / 2)
 
     if finemode == 1:
         # Custom disk for masking
+        print('creating custom disk...')
         mask = makeDisk(template_diam, template.shape[0])
         corr_map = imTemplateMatch(hp_img, template, mask)
     else:

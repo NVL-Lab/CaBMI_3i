@@ -5,8 +5,8 @@ import numpy as np
 from contextlib import contextmanager
 from scipy.io import savemat
 
-import nidaqmx
-from nidaqmx.constants import LineGrouping
+#import nidaqmx
+#from nidaqmx.constants import LineGrouping
 
 from save_files_3i import save_files_3i
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
@@ -104,6 +104,6 @@ def baseline_acqnvs_3i(path_data, roi_mask, tset, a, apin):
                 counter_same += 1
 
         print("Finished baseline")
-        playTone(a, apin, 7000, 1)  # custom, will we use an arduino?
+        #playTone(a, apin, 7000, 1)  # custom, will we use an arduino?
         # pl.Disconnect() will be handled in cleanup
     return mat_path

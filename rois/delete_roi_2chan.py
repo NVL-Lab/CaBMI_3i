@@ -1,21 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from roi_data2chan import roi_data2chan
+from .roi_data2chan import roi_data2chan
 
 def delete_roi_2chan(plot_images, roi_data) -> list:
     """
     Function to delete ROIs from the image.
     """
-    screen_size = plt.get_current_fig_manager().window.wm_maxsize()
+    #screen_size = plt.get_current_fig_manager().window.wm_maxsize()
     
     # Show the red and green channels
     plt.close('all')
     for plot_img in plot_images:
         im_plot = plot_img['im']
         im_title = plot_img['label']
-        plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        #plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        plt.figure()
         plt.imshow(im_plot, cmap='gray')
-        plt.axis('square')
         plt.title(im_title)
         plt.show()
 
@@ -23,15 +23,15 @@ def delete_roi_2chan(plot_images, roi_data) -> list:
     complete_bool = False
     while not complete_bool:
         # Show images
-        plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        #plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        plt.figure()
         plt.imshow(roi_data['im_roi_rg'])
-        plt.axis('square')
         plt.title('roi colored by rg')
         plt.show()
         
-        plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        #plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        plt.figure()
         plt.imshow(roi_data['roi_mask'])
-        plt.axis('square')
         plt.title('roi idxs')
         plt.show()
 
@@ -39,15 +39,15 @@ def delete_roi_2chan(plot_images, roi_data) -> list:
         del_data = delete_rois(roi_data, del_idxs)
 
         # Show new images
-        plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        #plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        plt.figure()
         plt.imshow(del_data['im_roi_rg'])
-        plt.axis('square')
         plt.title('roi colored by rg, AFTER DELETION')
         plt.show()
         
-        plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        #plt.figure(figsize=(screen_size[0] / 200, screen_size[1] / 200))
+        plt.figure()
         plt.imshow(del_data['roi_mask'])
-        plt.axis('square')
         plt.title('roi idxs, AFTER DELETION')
         plt.show()
 

@@ -18,7 +18,7 @@ def get_center(temp, mat=None, toplot=False):
     if mat is None:
         mat = np.zeros_like(temp)
         toplot = False
-    
+
     cell_ind = np.unique(temp)
     cell_ind = cell_ind[cell_ind != 0]  # Remove the 0 index
     num_cells = len(cell_ind)
@@ -37,13 +37,11 @@ def get_center(temp, mat=None, toplot=False):
             plt.imshow(temp, cmap='bone')
             plt.clim([-0, np.nanmedian(temp) * 5])
             plt.scatter(x, y, c='r', s=50)
-            plt.axis('square')
-            
+
             plt.subplot(1, 2, 2)
             plt.imshow(mat, cmap='bone')
             plt.clim([-0, np.nanmedian(mat) * 5])
             plt.scatter(x, y, c='r', s=50)
-            plt.axis('square')
         else:
             plt.subplot(1, 2, 1)
             plt.imshow(temp, cmap='bone')

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.color import gray2rgb
-from roi_bin_cell2center_radius import roi_bin_cell2center_radius
+from .roi_bin_cell2center_radius import roi_bin_cell2center_radius
 
 def label_mask2roi_data_single_channel(im_bg, label_mask, chan_data):
     roi_data = {}
@@ -45,8 +45,8 @@ def label_mask2roi_data_single_channel(im_bg, label_mask, chan_data):
     # Assign channel info
     roi_data['chan'] = [{} for _ in range(num_chan)]
     for i, chan in enumerate(chan_data):
-        chan_idx = chan['chan_idx']
-        roi_data['chan'][chan_idx]['label'] = chan['label']
+        chan_idx = chan_data['chan_idx']-1
+        roi_data['chan'][chan_idx]['label'] = chan_data['label']
         roi_data['chan'][chan_idx]['num_rois'] = roi_data['num_rois']
         roi_data['chan'][chan_idx]['idxs'] = list(range(1, roi_data['num_rois'] + 1))
         roi_data['chan'][chan_idx]['im_roi'] = roi_data['im_roi']
@@ -57,14 +57,14 @@ def label_mask2roi_data_single_channel(im_bg, label_mask, chan_data):
     plt.figure(figsize=(8, 8))
     plt.imshow(roi_data['im_bg'])
     plt.title('Background Image')
-    plt.axis('square')
+    #plt.axis('square')
     plt.colorbar()
     plt.show()
 
     plt.figure(figsize=(8, 8))
     plt.imshow(roi_data['im_roi'])
     plt.title(f'Num ROI: {roi_data["num_rois"]}')
-    plt.axis('square')
+    #plt.axis('square')
     plt.colorbar()
     plt.show()
 

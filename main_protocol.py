@@ -1,36 +1,37 @@
 author_= 'Saul Gurgua Lopez'
 
+import sys
 from pathlib import Path
-
-import os
-import numpy as np
-from scipy.io import savemat #maybe change to save numpy
-from scipy.ndimage import label
 import matplotlib.pyplot as plt
-from scipy.io import loadmat
-#from pyfirmata import Arduino, util
+from scipy.ndimage import label
+
+#from scipy.io import savemat #maybe change to save numpy
+#from scipy.io import loadmat
 
 from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
 from SBReadFile22.SBReadFile import *
 from rois.scale_im_interactive import scale_im_interactive
-
-#from segmentation.im_find_cells_tm import im_find_cells_tm
+from segmentation.im_find_cells_tm import im_find_cells_tm
 from rois.get_center import get_center
-#from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
-#from rois.delete_roi_2chan import delete_roi_2chan
-#from rois.draw_roi_g_chan import draw_roi_g_chan
-#from baseline_acqnvs_3i import baseline_acqnvs_3i
-from plots.plot_neurons_baseline import plot_neurons_baseline
-from plots.plot_neurons_ensemble import plot_neurons_ensemble
-from rois.select_roi_data import select_roi_data
-from calibration.baseline2target import baseline2target
-from params.create_vector_random_stim import get_random_stim
+from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
+from rois.delete_roi_2chan import delete_roi_2chan
+from rois.draw_roi_g_chan import draw_roi_g_chan
+from baseline_acqnvs_3i import baseline_acqnvs_3i
+
+
+
+#from plots.plot_neurons_baseline import plot_neurons_baseline
+#from plots.plot_neurons_ensemble import plot_neurons_ensemble
+#from rois.select_roi_data import select_roi_data
+#from calibration.baseline2target import baseline2target
+#from params.create_vector_random_stim import get_random_stim
 
 #import bmi_acqnvs_3i
 
 if __name__ == '__main__':
+    sldy_dir = sys.argv[1]
     exp_info = get_exp_info()
     save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     #save_path.mkdir(parents=True, exist_ok=True)
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     print(path_data)
 
     SBFileReader = SBReadFile()
-    if not SBFileReader.Open('/Users/saulglopez/Downloads/Slide3-testing.sldy'):
+    if not SBFileReader.Open(sldy_dir):
         print('.sldy file not found')
         exit(1)
 
@@ -85,38 +86,26 @@ if __name__ == '__main__':
     plot_images[1]['im'] = im_bg
     plot_images[1]['label'] = 'scaled'
 
-    print(plot_images)
-    exit()
     # we may want 10 hits per 5 min (every 60 to 90 sec)
     # show more of a range of hits for cursor
     # A T = 0.3 or 0.4 (OR 3 or 4) (we want 0.5 to 1) might be noise so we wouldn't want that
     # Want a Gaussian distribtuion of T, if not a bit flatter overall
     # Calibration may be wrong if no hits happen in the first 5 min
-
-    mask_intermediate = im_find_cells_tm(im_bg, task_set)
+    mask_intermediate, _ = im_find_cells_tm(im_bg, task_set['roi']['template_diam'],task_set['roi']['thres'], task_set['roi']['cell_diam'], task_set['roi']['finemode'], task_set['roi']['temmode'] )
     init_roi_mask = label(mask_intermediate)
-    get_center(init_roi_mask, im_bg)
-    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask, task_set.im.chan_data)
+    x_center, y_center = get_center(init_roi_mask[0], im_bg, True)
+    roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask[0], task_set['im']['chan_data'])
 
     # Visualize
-    # get() is from matlab and may be simulated in python with tkinter
-    """
-    screen_size = get(0,'ScreenSize');
-    h = figure('Position', [screen_size(3)/2 1 screen_size(3)/2 screen_size(4)]);
-    hold on;
-    imagesc(roi_data.im_roi); %colormap('gray');  
-    axis square;
-    title('ROI footprint overlay in blue'); 
-    % scatter(roi_data.x, roi_data.y, pi*roi_data.r.^2, 'r'); 
+    plt.figure()
+    plt.imshow(roi_data['im_roi'], cmap='bone', vmin=0, vmax=1)
+    plt.title('ROI footprint overlay in blue')
+    plt.show()
 
-    %
-    h = figure('Position', [screen_size(3)/2 1 screen_size(3)/2 screen_size(4)]);
-    % hold on;
-    imagesc(roi_data.roi_mask); %colormap('gray');  
-    axis square;
-    title('ROI Mask'); 
-    % scatter(roi_data.x, roi_data.y, pi*roi_data.r.^2, 'r');
-    """
+    plt.figure()
+    plt.imshow(roi_data['roi_mask'], cmap='bone', vmin=0, vmax=1)
+    plt.title('ROI Mask')
+    plt.show()
 
     # Delete ROI if needed
     print('Deleting ROIs from image!')
@@ -124,33 +113,39 @@ if __name__ == '__main__':
     plt.close('all')
 
     # Add ROI if needed
+    '''
     print('Adding ROIs to image!')
     roi_data = draw_roi_g_chan(plot_images, roi_data)
     plt.close('all')
+    '''
 
     # See ROI if needed
     see_roi_data_flag = True
     if see_roi_data_flag:
-        screen_size = plt.get_current_fig_manager().window.wm_maxsize()
-        fig1 = plt.figure(figsize=(screen_size[0]/200, screen_size[1]/200))
+        #screen_size = plt.get_current_fig_manager().window.wm_maxsize()
+        #fig1 = plt.figure(figsize=(screen_size[0]/200, screen_size[1]/200))
+        plt.figure()
         plt.imshow(roi_data['roi_mask'], cmap='gray')
-        plt.axis('square')
         plt.title(f'roi_mask num roi: {roi_data["num_rois"]}')
         plt.show()
 
-        fig2 = plt.figure(figsize=(screen_size[0]/200, screen_size[1]/200))
+        #fig2 = plt.figure(figsize=(screen_size[0]/200, screen_size[1]/200))
+        plt.figure()
         plt.imshow(roi_data['im_roi'], cmap='gray')
-        plt.axis('square')
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
 
     # Save roi_data
+    '''
     roi_data_file = os.path.join(save_path, 'roi_data.mat')
     savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
+    '''
 
     # Baseline acquisition
-    base_mat_path = baseline_acqnvs_3i(path_data, roi_data.roi_mask, task_set, a, fb_set.arduino.pin)
-    base_mat = loadmat(base_mat_path)[0][0];
+    # remove a and fb_set.arduino.pin)
+    base_mat_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set, a, fb_set.arduino.pin)
+    #base_mat = loadmat(base_mat_path)[0][0];
+    exit()
 
     # Plot neurons from baseline
     plot_neurons_baseline(base_mat['base_activity'], [], [], np.max(roi_data['num_rois']))

@@ -3,9 +3,9 @@ import numpy as np
 from matplotlib.widgets import PolygonSelector
 from matplotlib.path import Path
 
-from roi_bin_cell2center_radius import roi_bin_cell2center_radius
-from roi_data2chan import roi_data2chan
-from dex.draw_rois import draw_rois
+from .roi_bin_cell2center_radius import roi_bin_cell2center_radius
+from .roi_data2chan import roi_data2chan
+from .dex.draw_rois import draw_rois
 
 def draw_roi_g_chan(plot_images, roi_data):
     # Show the red and green channels

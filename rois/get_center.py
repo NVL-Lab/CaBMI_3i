@@ -29,13 +29,14 @@ def get_center(temp, mat=None, toplot=False):
     for i in range(num_cells):
         y[i] = round(np.mean(np.where(temp.T == cell_ind[i])[0]) / temp.shape[1])
         x[i] = round(np.mean(np.where(temp == cell_ind[i])[0]) / temp.shape[0])
-    
+
+    # create variable for using median first, then the mean
     if toplot:
         plt.figure()
         if y.size > 0:
             plt.subplot(1, 2, 1)
             plt.imshow(temp, cmap='bone')
-            plt.clim([-0, np.nanmedian(temp) * 5])
+            plt.clim([-0, np.mean(temp) * 3])
             plt.scatter(x, y, c='r', s=50)
 
             plt.subplot(1, 2, 2)
@@ -45,8 +46,8 @@ def get_center(temp, mat=None, toplot=False):
         else:
             plt.subplot(1, 2, 1)
             plt.imshow(temp, cmap='bone')
-            plt.clim([-0, np.nanmedian(temp) * 5])
-            
+            plt.clim([-0, np.nanmedian(temp) * 3])
+
             plt.subplot(1, 2, 2)
             plt.imshow(mat, cmap='bone')
             plt.clim([-0, np.nanmedian(mat) * 5])

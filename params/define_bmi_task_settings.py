@@ -19,9 +19,9 @@ def get_bmi_settings(fr = 29.752) -> dict:
 
         # Regions of Interest (ROIs)
         'roi': {
-            'template_diam': 11,  # Diameter of difference of Gaussians in pixels
-            'thres': 0.4,         # Cell detection threshold as correlation coefficient
-            'cell_diam': 7,       # CELL_DIAM is diameter used for dilation.
+            'template_diam': 3,  # Diameter of difference of Gaussians in pixels
+            'thres': 0.5,         # Cell detection threshold as correlation coefficient
+            'cell_diam': 17,       # CELL_DIAM is diameter used for dilation.
             'finemode': 1,       # imTemplateMatch will be used instead of normxcorr2. It will be slower.
             'temmode': True      # false is for full circle (soma); true is for donuts (membrane)
         },

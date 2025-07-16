@@ -1,4 +1,5 @@
 import numpy as np
+from pygments.formatters import img
 from scipy.ndimage import gaussian_filter, label
 from skimage.morphology import disk, binary_dilation
 from skimage.feature import match_template
@@ -81,8 +82,19 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
         # Pad with zeros though am unsure if this is correct
         corr_map = np.pad(corr_map, ((pad_top, pad_bottom), (pad_left, pad_right)), mode='constant', constant_values=0)
 
-    # FOR TESTING
-    '''
+    # FOR TESTING - check if i can find the shape/size as well, not just the center
+    # May want to use OpenCV Feature-Based Matchers to return the exact shapes of the circle.
+    # Create another testing with the kernel used in random areas. Make the different sizes and then compress from one side to see if the matching works
+    # An issue might be that there might be two neurons that may be so close that they will look like one weird neuron
+    # I will need to erode (shrink), label, and dilate (make bigger again) to for sure have different neurons labeled
+
+    # Try suite2p and run 100 tifs of an image to detect neurons. look at stat.npy ['xpix'] and ['ypix'] to create the mask
+    # need the default ops and use on holo data
+    # would only need to run registration and roi detection... actually just run the detection wrapper from the link nuria sent
+    # take arecording of 4 seconds (~120 frames) of the pollen with default ops and see if it can identify the pollen as neurons
+    # make ops['anatomical_only'] to 0
+    # once i can find the neurons, then i can zip the xoff and yoff to create the maski
+
     hp_img = hp_img.astype(float)
     template = template.astype(float)
     th, tw = template.shape
@@ -99,13 +111,15 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     result = match_template(base_img, template, pad_input=True)
     threshold = 0.95
     match_locations = np.where(result > threshold)
+    print('result')
+    print(result)
     print(result[30, 40])
     print(match_locations)
     plt.figure()
     plt.imshow(result, cmap='gray')
     plt.title("Template Matches")
     plt.show()
-    '''
+    exit()
 
     # === Detect Cells ===
     cells = corr_map > r_threshold

@@ -123,11 +123,14 @@ def main(argv):
     theTimePaused = 0;
     theMaxWaitS = 10 # wait at most 5 seconds. If over this, quit
     theSleepS = 0.1 # sleep between refreshes
-    st = time.time()
+    st= time.time()
+    st1 = st
+    time_elapsed = []
     try:
         for theRetry in range(0,20000):
             for theTimepoint in range(theFirstTP,theNumTimepoints):
                 image = theSBFileReader.ReadImagePlaneBuf(theCapture,0,theTimepoint,theZplane,0,True) #captureid,position,timepoint,zplane,channel,as 2d
+                time_elapsed.append(time.time()-st1); st1 = time.time()
                 #print ("*** The read buffer len is: " , len(image))
                 #calculate mean intensity using numpy
                 theMean = np.mean(image)
@@ -172,7 +175,8 @@ def main(argv):
             theNumTimepoints = theSBFileReader.GetNumTimepoints(theCapture)-1
     except:
         print("Keyboard Interrupt")
-        
+
+    np.save("C:\\Users\\saul\\Downloads\\time_elapsed.npy", np.array(time_elapsed), allow_pickle=True)
 
     et = time.time()
     elapsed_time = et - st - theTimePaused

@@ -1,9 +1,9 @@
 import numpy as np
-from pygments.formatters import img
+#from pygments.formatters import img
 from scipy.ndimage import gaussian_filter, label
 from skimage.morphology import disk, binary_dilation
 from skimage.feature import match_template
-import cv2
+import cv2 # installed via pip on windows
 from .im_filter2 import im_filter2
 from .dog_n import dog_n
 from .dog_n2 import dog_n2
@@ -95,6 +95,7 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     # make ops['anatomical_only'] to 0
     # once i can find the neurons, then i can zip the xoff and yoff to create the maski
 
+    '''
     hp_img = hp_img.astype(float)
     template = template.astype(float)
     th, tw = template.shape
@@ -119,6 +120,10 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     plt.imshow(result, cmap='gray')
     plt.title("Template Matches")
     plt.show()
+    '''
+
+
+
     exit()
 
     # === Detect Cells ===

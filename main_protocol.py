@@ -31,7 +31,7 @@ from baseline_acqnvs_3i import baseline_acqnvs_3i
 #import bmi_acqnvs_3i
 
 if __name__ == '__main__':
-    sldy_dir = sys.argv[1]
+    sldy_dir = sys.argv[1] # Do not convert dir to a Path object -> error with 3i code
     exp_info = get_exp_info()
     save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     #save_path.mkdir(parents=True, exist_ok=True)
@@ -69,14 +69,15 @@ if __name__ == '__main__':
         num_im_sc will not be used
         only necessary paramater is im_summary
     '''
+    print('Image Scaling')
+    print('----------------------------------------')
     im_sc_struct, _ = scale_im_interactive(im_summary, [],0)
-
-    # ROI Visualization
     im_bg = im_sc_struct[-1]['im']
     plt.figure()
     plt.imshow(im_bg, cmap='bone', vmin=0, vmax=4 * np.nanmean(im_bg)) # why the nanmean
     plt.title('Background for tseROI Identification')
     plt.show()
+    print('----------------------------------------')
 
     # PLOT_IMAGES data
     # 'plot_images' contains a set of images so user can tell if ROI selection is appropriate
@@ -91,6 +92,8 @@ if __name__ == '__main__':
     # A T = 0.3 or 0.4 (OR 3 or 4) (we want 0.5 to 1) might be noise so we wouldn't want that
     # Want a Gaussian distribtuion of T, if not a bit flatter overall
     # Calibration may be wrong if no hits happen in the first 5 min
+    print('Cell Identification')
+    print('----------------------------------------')
     mask_intermediate, _ = im_find_cells_tm(im_bg, task_set['roi']['template_diam'],task_set['roi']['thres'], task_set['roi']['cell_diam'], task_set['roi']['finemode'], task_set['roi']['temmode'] )
     init_roi_mask = label(mask_intermediate)
     x_center, y_center = get_center(init_roi_mask[0], im_bg, True)
@@ -106,6 +109,7 @@ if __name__ == '__main__':
     plt.imshow(roi_data['roi_mask'], cmap='bone', vmin=0, vmax=1)
     plt.title('ROI Mask')
     plt.show()
+    print('----------------------------------------')
 
     # Delete ROI if needed
     print('Deleting ROIs from image!')

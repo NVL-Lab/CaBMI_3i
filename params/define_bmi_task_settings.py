@@ -3,9 +3,11 @@ import math
 
 def get_bmi_settings(fr = 29.752) -> dict:
     return {
-        'baseline_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_baseline_15.env'),
-        'bmi_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_BMI_30.env'),
-        
+        #'baseline_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_baseline_15.env'),
+        #'bmi_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_BMI_30.env'),
+        'baseline_env': Path('utils/Tseries_baseline_15.env'),
+        'bmi_env': Path('utils/Tseries_BMI_30.env'),
+
         # Imaging
         'im': {
             'frame_rate': fr,     # Copy from PrairieValue (might change with 3i)

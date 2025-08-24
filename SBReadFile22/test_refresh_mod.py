@@ -122,24 +122,36 @@ def main(argv):
     theNoProgress = 0;
     theTimePaused = 0;
     theMaxWaitS = 10 # wait at most 5 seconds. If over this, quit
-    theSleepS = 0.1 # sleep between refreshes
+    #theSleepS = 0.1 # sleep between refreshes
+    theSleepS = 0.02 #0.01
     st= time.time()
-    st1 = st
     time_elapsed = []
+    #data_load = []
+    #time_elapsed = np.empty(1000)
+    old_image = 0
     try:
-        for theRetry in range(0,20000):
+        for theRetry in range(0,20000): # for theRetry in range(0,20000):
             for theTimepoint in range(theFirstTP,theNumTimepoints):
+                st1 = time.perf_counter()
+                #st1 = time.perf_counter()
                 image = theSBFileReader.ReadImagePlaneBuf(theCapture,0,theTimepoint,theZplane,0,True) #captureid,position,timepoint,zplane,channel,as 2d
-                time_elapsed.append(time.time()-st1); st1 = time.time()
+                time_elapsed.append(time.perf_counter()-st1)#; st1 = time.time()
+                #data_load.append(image)
+                #time_elapsed.append(time.perf_counter())
+                #if old_image != image:
+                #    old_image = image
+                #else:
+                #    continue
                 #print ("*** The read buffer len is: " , len(image))
                 #calculate mean intensity using numpy
+
                 theMean = np.mean(image)
-                print ("*** theTimepoint: " , theTimepoint, "The mean: ",theMean)
+                print ("*** theTimepoint: " , theTimepoint+1, "The mean: ",theMean)
                 if theMean==0:
                     #streaming has missed a timepoint
                     #insert a break here
                     print ("****** Mean is 0 ****** ")
-
+                '''
                 #plot the slice every n timepoints
 
                 if theTimepoint%thePlotFrequency==0:
@@ -155,6 +167,8 @@ def main(argv):
                     except KeyboardInterrupt:
                         print("Keyboard Interrupt")
                         sys.exit()
+                #print(time.time()-st1)
+                '''
 
             # see if there are any new timepoints
             theSBFileReader.Refresh(theCapture)
@@ -165,22 +179,28 @@ def main(argv):
             else:
                 theNoProgress = 0
                 time.sleep(theSleepS)
+            print(theNoProgress)
 
             # if we have waited too long, quit
             if theNoProgress * theSleepS  > theMaxWaitS:
                 break
 
+
             #loop again
-            theFirstTP = theNumTimepoints;
-            theNumTimepoints = theSBFileReader.GetNumTimepoints(theCapture)-1
+            theFirstTP = theNumTimepoints
+            theNumTimepoints = theSBFileReader.GetNumTimepoints(theCapture)#-1
     except:
         print("Keyboard Interrupt")
 
     np.save("C:\\Users\\saul\\Downloads\\time_elapsed.npy", np.array(time_elapsed), allow_pickle=True)
+    #np.save("C:\\Users\\saul\\Downloads\\data_load.npy", np.array(data_load), allow_pickle=True)
 
+    '''
     et = time.time()
     elapsed_time = et - st - theTimePaused
     print('Execution time per loop iteration:', elapsed_time/theNumTimepoints, " s", ", waited for: ",theTimePaused," s")
+    '''
+    print(np.mean(np.array(time_elapsed)))
 
     data = input("Please hit Enter to exit:\n")
     print("Done")

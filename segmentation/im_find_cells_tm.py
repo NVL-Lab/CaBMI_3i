@@ -95,6 +95,7 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     # make ops['anatomical_only'] to 0
     # once i can find the neurons, then i can zip the xoff and yoff to create the maski
 
+    '''
     hp_img = hp_img.astype(float)
     template = template.astype(float)
     th, tw = template.shape
@@ -120,7 +121,7 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
     plt.title("Template Matches")
     plt.show()
     exit()
-
+    '''
     # === Detect Cells ===
     cells = corr_map > r_threshold
     labeled_cells, _ = label(cells)

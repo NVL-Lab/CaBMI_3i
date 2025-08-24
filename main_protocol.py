@@ -4,11 +4,12 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
+#import suite2p
 
 #from scipy.io import savemat #maybe change to save numpy
 #from scipy.io import loadmat
 
-from params.define_exp_path import get_exp_info
+from params.define_exp_pat import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
 from SBReadFile22.SBReadFile import *
@@ -95,6 +96,25 @@ if __name__ == '__main__':
     init_roi_mask = label(mask_intermediate)
     x_center, y_center = get_center(init_roi_mask[0], im_bg, True)
     roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask[0], task_set['im']['chan_data'])
+
+    '''
+    print('Detecting Cells')
+    ops, stat = suite2p.detection_wrapper(f_reg=im_bg, ops=suite2p.default_ops(), classfile=suite2p.classification.builtin_classfile) # im_bg must be npy file
+    iscell = suite2p.detection.classify(stat, suite2p.classification.builtin_classfile )
+    roi_mask = np.zeros((ops['Ly'], ops['Lx']), dtype=np.uint32)
+    cell_count = 0
+    for i, roi in enumerate(stat):
+        if iscell[i]:
+            cell_count += 1
+            roi_mask[roi['ypix'], roi['xpix']] = cell_count * roi['lam']
+    print(f"{cell_count} cells detected.")
+    plt.figure()
+    plt.imshow(roi_mask, cmap='nipy_spectral')
+    plt.title("ROI Neurons")
+    plt.colorbar(label="Label index")
+    plt.show()
+    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask[0], task_set['im']['chan_data'])
+    '''
 
     # Visualize
     plt.figure()

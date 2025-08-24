@@ -125,7 +125,6 @@ def im_find_cells_tm(img, template_diam, r_threshold=0.5, cell_diam=None, finemo
 
 
     exit()
-    '''
     # === Detect Cells ===
     cells = corr_map > r_threshold
     labeled_cells, _ = label(cells)

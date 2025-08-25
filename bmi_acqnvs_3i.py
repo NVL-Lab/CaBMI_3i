@@ -3,13 +3,16 @@ from contextlib import contextmanager
 import numpy as np
 from scipy.io import loadmat
 import time
-import nidaqmx # may be for s = nidaqmx.Task()
+#import nidaqmx # may be for s = nidaqmx.Task()
 
 import save_files_3i
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio
 from expt2bmi_flags import get_flags
+from params.play_tone import play_tone
+
+from SBReadFile22.SBReadFile import *
 
 @contextmanager
 def on_cleanup(save_path, bData, debug_bool):
@@ -17,15 +20,16 @@ def on_cleanup(save_path, bData, debug_bool):
         yield
     finally:
         # The following is the clean_me_up():
-        global pl, baseActivity
-        print('cleaning')
+        #global pl, baseActivity
+        print('Cleaning')
         # Should be equivalent to the mat files but in npz format (multiple arrays)
         np.savez(f'{save_path}/BMI_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npz', data=data, bData=bData)
         if not debug_bool:
-            if pl.Connected():
-                pl.Disconnect()
+            print('disconnection')
+            #if pl.Connected():
+            #    pl.Disconnect()
 
-def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal, a) -> None:
+def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
     # Load flag configuration file
     flags = get_flags()[expt_str]
     flag_bmi = flags['BMI_stim']
@@ -33,47 +37,31 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     flag_stim_random = flags['StimRandom']
     flag_water = flags['Water']
 
-    '''
-    tset = define_BMI_task_settings();
-    fbset = define_fb_audio_settings();
-    a = arduino(fbset.arduino.com, fbset.arduino.label);
-    '''
-
-    '''
-    Path to save information
-    Lines 29-68
-    '''
-
-    # Connect to i3 Application
-    '''
-    Lines 88 - 116 
-    Get image
-
-    Lines 117 - 217
-    Get ROIs
-    '''
-
-    # BMI parameters 
+    # BMI parameters
     tset['im']['frame_rate'] = 30
-    relaxation_time = 0
+    relaxation_time = 0 # there can't be another hit in this many sec
 
-    experiment_length = 60*30*tset['im']['frame_rate']
+    # Values of parameters in frames
+    experiment_length = 60*30*tset['im']['frame_rate'] # in frames
     relaxation_frames = round(relaxation_time*tset['im']['frame_rate'])
     
     #bdata = load(fullfile(baseline_calib_file)) - assuming this is a mat file
-    bdata = loadmat(baseline_calib_file)
+    bdata = np.load(baseline_calib_file, allow_pickle=True)
     back2base = 1/2*bdata['t1'];
 
-    global pl, data
+    # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
+    # ** ** ** ** ** ** ** ** ** Initialization of BMI acquisition ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
+    # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
 
+    #global pl, data
     number_neurons = len(bdata['E_id'])
 
     # Pre-allocating arrays
     fbuffer = np.full((number_neurons, tset['dff_win']), np.nan, dtype=np.float32)
 
-    data = {}
-    expected_length_experiment = int(np.ceil(experiment_length))
+    #expected_length_experiment = int(np.ceil(experiment_length)) # unknown use
 
+    data = {}
     data['cursor'] = np.full(experiment_length, np.nan, dtype=np.float32)
     data['fb_freq'] = np.full(experiment_length, np.nan, dtype=np.float32)
     data['bmi_act'] = np.full((number_neurons, experiment_length), np.nan, dtype=np.float32)
@@ -117,6 +105,9 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
     # Cleaning 
     with on_cleanup(path_data['save_path'], bdata, debug_bool):
+        # To prepare nidaq - not needed
+        # extract info for channel
+        '''
         if not debug_bool:
             # Clear the previous session if it exists
             try:
@@ -129,20 +120,24 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
             ni_out = [0, 0, 0]
             s.write(ni_out)  # Set the initial state
-            ni_getimage = [0, 1, 0]
+            ni_getimage = [0, 1, 0] # Capture from green channel?
+        '''
 
         # Prepare for 3i
         if not debug_bool:
             # The following connection to 3i might not exist
             # Connection to Prairie
-            pl = win32com.client.Dispatch('PrairieLink.Application')
-            pl.Connect()
-            time.sleep(2)  # Pause is needed to give time to Prairie to connect
+            sb_file_reader = SBReadFile()
+            if not sb_file_reader.Open(sldy_dir):
+                print('.sldy file not found')
+                exit(1)
 
             # Prairie variables
-            px = pl.PixelsPerLine()
-            py = pl.LinesPerFrame()
+            px = sb_file_reader.GetNumXColumns(0)
+            py = sb_file_reader.GetNumYRows(0)
 
+            # Unsure if the following Prairie commands are necessary
+            '''
             # Prairie commands
             pl.SendScriptCommands('-srd True 0')
             pl.SendScriptCommands('-lbs True 0')
@@ -150,10 +145,12 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
             # Set the environment for the Time Series in PrairieView
             load_command = f'-tsl {path_data["bmi_env"]}'
             pl.SendScriptCommands(load_command)
+            '''
 
             # Set the path where to store the imaging data - SetSavePath (-p) "path" ["addDateTime"]
-            save_files_3i(path_data["save_path"], pl, expt_str)
+            save_files_3i(path_data["save_path"], '', expt_str)
         else:
+            # Not sure if the px and py can be changed
             px = 512
             py = 512
 
@@ -165,36 +162,47 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
         if not debug_bool:
             time.sleep(2)
-            pl.SendScriptCommands('-ts')
+            #pl.SendScriptCommands('-ts')
             time.sleep(2)  # Empirically discovered time for the Prairie to start gears
 
         data["frame"] = 1
 
         # Give random reward to trigger the jetball
+        # Unknown how this will be done or what it does
+        '''
         a.write_digital("D9", 1)
         time.sleep(1)
         a.write_digital("D9", 0)
-
+        '''
         print('STARTING RECORDING!!!')
 
         counter_same = 0  # Counts how many frames are the same as the past
         counter_same_thresh = 500
         base_buffer_full = False  # Boolean indicating if the fbuffer is filled
+        capture = 2 # This capture should be the third within the slide - first = init for roi detection, second=baseline, third=bmi
+        plane_count = sb_file_reader.GetNumZPlanes(capture)
+        z_plane = int(plane_count/2)
 
         print('baseBuffer filling!...')
         while (not debug_bool and counter_same < counter_same_thresh) or (debug_bool and data['frame'] <= debug_input.shape[1]):
             if not debug_bool:
-                im = pl.GetImage_2(tset['im']['chan_data']['chan_idx'], px, py)
+                #im = pl.GetImage_2(tset['im']['chan_data']['chan_idx'], px, py)
+                im = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, z_plane, tset['im']['chan_data']['chan_idx'], True)
             else:
                 im = np.zeros((px, py))
 
             if not np.array_equal(im, last_frame) or debug_bool:
-                start_time = time.time()  # Start timing to see the length of an iteration
+                #start_time = time.time()  # Start timing to see the length of an iteration
+                start_time = time.perf_counter()
+
+                # What is this for?
+                '''
                 if not debug_bool:
                     last_frame = im  # Comparison and assignment takes ~4ms
                     s.write(ni_getimage)
                     time.sleep(0.001)
                     s.write([0, 0, 0])
+                '''
 
                 if non_buffer_update_counter == 0:
                     if not debug_bool:
@@ -247,8 +255,8 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                         data['fb_freq'][data['frame']] = fb_freq_i
 
                         if fb_bool and not debug_bool:
-                            # This will be from the computer
-                            playTone(a, fb_cal['settings']['arduino']['pin'], fb_freq_i, fb_cal['settings']['arduino']['duration'])
+                            #playTone(a, fb_cal['settings']['arduino']['pin'], fb_freq_i, fb_cal['settings']['arduino']['duration'])
+                            play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
 
                         if buffer_update_counter == 0 and base_buffer_full:
                             if trial_flag and not back2baseline_flag:
@@ -332,28 +340,3 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                         time.sleep(1 / (tset['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
                 else:
                     counter_same += 1
-
-def clean_me_up(save_path, b_data, debug_bool, pl, data):
-    """
-    Cleans up the environment, saves necessary data, and disconnects the PrairieLink connection if needed.
-
-    Parameters:
-    save_path (str): The path where the data should be saved.
-    b_data (dict): The bData to be saved.
-    debug_bool (bool): Whether the script is running in debug mode.
-    pl (object): The PrairieLink object for managing the connection.
-    data (dict): The data to be saved.
-    """
-    print('cleaning')
-
-    # Saving the global variables
-    now_str = datetime.datetime.now().strftime('%y%m%dT%H%M%S')
-    save_filename = f'{save_path}/BMI_online_{now_str}.mat'
-    
-    # Save the data using scipy.io.savemat
-    # May want to not do this anymore
-    savemat(save_filename, {'data': data, 'bData': b_data})
-    
-    if not debug_bool:
-        if pl.Connected():
-            pl.Disconnect()

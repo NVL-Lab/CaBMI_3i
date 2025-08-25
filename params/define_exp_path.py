@@ -1,6 +1,7 @@
 def get_exp_info() -> dict:
     return {
-        'folder': '~/Downloads',
+        'sldy_dir': 'F:',
+        'folder': 'Downloads',
         'animal': 'ago23', 
         'day': 'DF',
         'date': '230423',

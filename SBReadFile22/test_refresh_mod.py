@@ -52,7 +52,7 @@ def main(argv):
     print ('Input file: ', theFileName,' image number: ',theCapture, ' channel number: ',theChannel)
 
     theSecToWait = 500
-    #this secion tries to open the file and see if there is data
+    #this section tries to open the file and see if there is data
     #otherwise it retries every second up to "theSecToWait" seconds
     for theTry in range(1,theSecToWait):
         if os.path.isfile(theFileName) == True:

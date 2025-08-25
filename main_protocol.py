@@ -6,9 +6,6 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import label
 #import suite2p
 
-#from scipy.io import savemat #maybe change to save numpy
-#from scipy.io import loadmat
-
 from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
@@ -21,20 +18,24 @@ from rois.delete_roi_2chan import delete_roi_2chan
 from rois.draw_roi_g_chan import draw_roi_g_chan
 from baseline_acqnvs_3i import baseline_acqnvs_3i
 
+from plots.plot_neurons_baseline import plot_neurons_baseline
+from plots.plot_neurons_ensemble import plot_neurons_ensemble
+from rois.select_roi_data import select_roi_data
+from calibration.baseline2target import baseline2target
+from params.create_vector_random_stim import get_random_stim
 
-
-#from plots.plot_neurons_baseline import plot_neurons_baseline
-#from plots.plot_neurons_ensemble import plot_neurons_ensemble
-#from rois.select_roi_data import select_roi_data
-#from calibration.baseline2target import baseline2target
-#from params.create_vector_random_stim import get_random_stim
-
-#import bmi_acqnvs_3i
+from bmi_acqnvs_3i import bmi_acqnvs_3i
+from check_motor_behavior import check_motor_behavior
 
 #/Users/saulglopez/Library/CloudStorage/OneDrive-UAB-TheUniversityofAlabamaatBirmingham/Research/NVL (Llopis)/3i/test_results/Slide3-testing.sldy
+#C:\Users\Saul\OneDrive - UAB - The University of Alabama at Birmingham\Research\NVL (Llopis)\3i\test_results\Slide3-testing.sldy
+
+'''
+    On Slidebook, create new slide
+'''
 
 if __name__ == '__main__':
-    sldy_dir = sys.argv[1] # Do not convert dir to a Path object -> error with 3i code
+    sldy_dir = Path(sys.argv[1]) # Do not convert dir to a Path object -> error with 3i code
     exp_info = get_exp_info()
     save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     #save_path.mkdir(parents=True, exist_ok=True)
@@ -49,10 +50,25 @@ if __name__ == '__main__':
     }
     print(path_data)
 
-    SBFileReader = SBReadFile()
-    if not SBFileReader.Open(sldy_dir):
-        print('.sldy file not found')
-        exit(1)
+    # Opening of sldy information
+    wait_counter = 500
+    for the_try in range(1, wait_counter):
+        if sldy_dir.exists():
+            try:
+                sb_file_reader = SBReadFile()
+                sb_file_reader.Open(str(sldy_dir), All=False)
+                break
+            except:
+                time.sleep(1)
+                print(the_try, "...")
+                continue
+        elif the_try == 1:
+            print('Input file does not exist, retrying for up to ', wait_counter, ' seconds\nOr hit Ctrl+c to exit')
+        if the_try == wait_counter - 1:
+            print('Giving up')
+            exit(1)
+        time.sleep(1)
+        print(the_try, "...")
 
     '''
     print(SBFileReader.GetNumCaptures())
@@ -63,14 +79,31 @@ if __name__ == '__main__':
     print(SBFileReader.GetAuxSerializedData(0,0,0))
     '''
 
-    # Get first image to obtain rois
-    im_summary = SBFileReader.ReadImagePlaneBuf(0,0,0,0,0,True)
+    '''
+        Parameters
+        ----------
+        inCaptureIndex: int
+            The index of the image group. Must be in range(0,number of captures)
+        inPositionIndex: int
+            The position of the image. If the image group is not a montage, use 0
+        inTimepointIndex: int
+            The time point
+        inZPlaneIndex: int
+            The z plane number
+        inChannelIndex: int
+            The channel number
+        inAs2D: bool, optional
+            if True, returns 2D array, otherwise (default) returns a 1D array
+    '''
+    # Single image is used to locate ROIs
+    # In SlideBook, do a simple capture through the first channel
+    im_summary = sb_file_reader.ReadImagePlaneBuf(0,0,0,0,0,True)
 
     # Scale image to see ROIs better
     '''
         Why save them all?
         num_im_sc will not be used
-        only necessary paramater is im_summary
+        only necessary parameter is im_summary
     '''
     print('Image Scaling')
     print('----------------------------------------')
@@ -93,7 +126,7 @@ if __name__ == '__main__':
     # we may want 10 hits per 5 min (every 60 to 90 sec)
     # show more of a range of hits for cursor
     # A T = 0.3 or 0.4 (OR 3 or 4) (we want 0.5 to 1) might be noise so we wouldn't want that
-    # Want a Gaussian distribtuion of T, if not a bit flatter overall
+    # Want a Gaussian distribution of T, if not a bit flatter overall
     # Calibration may be wrong if no hits happen in the first 5 min
     print('Cell Identification')
     print('----------------------------------------')
@@ -162,30 +195,21 @@ if __name__ == '__main__':
         plt.show()
 
     # Save roi_data
-    '''
-    roi_data_file = os.path.join(save_path, 'roi_data.mat')
-    savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
-    '''
+    # np.savez(save_path/'roi_data.npz', plot_images=plot_images, roi_data=roi_data, allow_pickle=True)')
+
     # Baseline acquisition
-    # remove a and fb_set.arduino.pin)
-    base_mat_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set, a, fb_set.arduino.pin)
-    #base_mat = loadmat(base_mat_path)[0][0];
-    exit()
+    bdata_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set)
+    bdata = np.load(bdata_path, allow_pickle=True)
 
     # Plot neurons from baseline
-    plot_neurons_baseline(base_mat['base_activity'], [], [], np.max(roi_data['num_rois']))
+    plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     e1_base = sorted([11, 12])
-    e2_base = sorted([4, 13])
-
+    e2_base = sorted([4, 13]) # 1 3 5 6 8 9 13
     ensemble_neurons = e1_base + e2_base
-    plot_neurons_ensemble(base_mat['base_activity'], ensemble_neurons, [1] * len(e1_base) + [2] * len(e2_base))
+    plot_neurons_ensemble(bdata, ensemble_neurons, [1] * len(e1_base) + [2] * len(e2_base))
     select_roi_data(roi_data, list(set(e2_base) | set(e1_base)))
 
-    # Assumining this will be a loadmat type file
-    # Check is base_mat exists (renamed from base_file) - logic matfile line 280
-    n_f_file = base_mat_path;
-    ndata = loadmat(base_mat_path)[0][0];
-    num_base_samples = np.sum(~np.isnan(ndata['base_activity'][0, :]))
+    num_base_samples = np.sum(~np.isnan(bdata[0, :]))
     baseline_frame_rate = num_base_samples / (15 * 60)
     
     sec_per_reward_range = np.array([120, 90])
@@ -203,6 +227,7 @@ if __name__ == '__main__':
     # Calculate reward per frame range
     reward_per_frame_range = 1. / frames_per_reward_range
 
+    # STOPPED - CONTINUE HERE
     target_info_path, target_cal_all_path, fb_cal = baseline2target(n_f_file, roi_data_file, e1_base, e2_base, frames_per_reward_range, task_set, save_path, fb_set)
 
     # Define the experiment length based on frame rate
@@ -235,8 +260,9 @@ if __name__ == '__main__':
     if fb_set['fb_bool']:
         fb_freq_i = 7000
         fb_set['arduino']['duration'] = 1
-        # This will be implemented from computer
-        #playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration']) # This will be changed and will use the MiceBall/RATBALL code, which has tone code
+        # Should change fbset['arduino']['duration'] to not include 'arduino' as a key
+        play_tone(fb_freq_i, fbset['arduino']['duration']) #This will be changed and will use the MiceBall/RATBALL code, which has tone code
+        #playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration'])
 
     # Set up base_val_seed for the BMI experiment
     base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan
@@ -246,12 +272,11 @@ if __name__ == '__main__':
     plt.imshow(im_bg)
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_acqnvs_3i(path_data, expt_str, target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal, a)
+    bmi_acqnvs_3i(path_data, expt_str, target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal)
 
     # D0:
     # 1) Save the workspace in folder
     # 2) Save this protocol script in the folder (savePath)
 
     # If motor behavior experiment, run this
-    #STOPPED HERE
-    check_motor_behavior(a, path_data, task_set, expt_str, fb_set['arduino']['pin'])
+    check_motor_behavior(path_data, task_set, expt_str)

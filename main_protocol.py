@@ -9,7 +9,7 @@ from scipy.ndimage import label
 #from scipy.io import savemat #maybe change to save numpy
 #from scipy.io import loadmat
 
-from params.define_exp_pat import get_exp_info
+from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
 from SBReadFile22.SBReadFile import *
@@ -30,6 +30,8 @@ from baseline_acqnvs_3i import baseline_acqnvs_3i
 #from params.create_vector_random_stim import get_random_stim
 
 #import bmi_acqnvs_3i
+
+#/Users/saulglopez/Library/CloudStorage/OneDrive-UAB-TheUniversityofAlabamaatBirmingham/Research/NVL (Llopis)/3i/test_results/Slide3-testing.sldy
 
 if __name__ == '__main__':
     sldy_dir = sys.argv[1] # Do not convert dir to a Path object -> error with 3i code
@@ -61,7 +63,7 @@ if __name__ == '__main__':
     print(SBFileReader.GetAuxSerializedData(0,0,0))
     '''
 
-    # Get first image to obtain rois (could be different live stream)
+    # Get first image to obtain rois
     im_summary = SBFileReader.ReadImagePlaneBuf(0,0,0,0,0,True)
 
     # Scale image to see ROIs better
@@ -164,7 +166,6 @@ if __name__ == '__main__':
     roi_data_file = os.path.join(save_path, 'roi_data.mat')
     savemat(roi_data_file, {'plot_images': plot_images, 'roi_data': roi_data})
     '''
-
     # Baseline acquisition
     # remove a and fb_set.arduino.pin)
     base_mat_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set, a, fb_set.arduino.pin)

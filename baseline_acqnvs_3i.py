@@ -11,7 +11,7 @@ from params.play_tone import play_tone
 from SBReadFile22.SBReadFile import *
 
 @contextmanager
-def on_cleanup(bdata_path):
+def on_cleanup(save_path, base_activity):
     try:
         yield
     except KeyboardInterrupt:
@@ -19,15 +19,14 @@ def on_cleanup(bdata_path):
     finally:
         print('Cleaning...')
         # consider storing everything under an npz
-        np.save(bdata_path, base_activity=base_activity, allow_pickle=True)
+        np.save(save_path, base_activity=base_activity, allow_pickle=True)
 
 def baseline_acqnvs_3i(path_data, roi_mask, tset):
     dilation_factor = 2
     expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frameRate'] * dilation_factor))
 
     # Save path
-    # Should be equivalent to the mat files but in npz format (multiple arrays)
-    bdata_path = path_data["save_path"] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
+    bdata_path = path_data['save_path'] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
 
     '''
     sb_file_reader = SBReadFile()
@@ -55,10 +54,10 @@ def baseline_acqnvs_3i(path_data, roi_mask, tset):
     max_wait = 5  # seconds
 
     print("Starting baseline acquisition")
-    print(theSBFileReader.GetImageName(capture))
+    print(sb_file_reader.GetImageName(capture))
 
     # Upon termination (including interruption) of the following code, data will be saved
-    with on_cleanup(bdata_path):
+    with on_cleanup(bdata_path, base_activity):
         for the_retry in range(0, 500):  # Will run for 500 frames
             for time_point in range(init_time_point, time_point_count):
                 print(f'*** Time Point: {time_point + 1}')

@@ -56,7 +56,7 @@ def baseline2target(n_f_file, roi_data_file, e1_base, e2_base, frames_per_reward
     plot_cov_bool = True
 
     # Define the path for saving plots
-    plot_path = savePath/'plots'
+    plot_path = save_path/'plots'
 
     # Create the directory if it does not exist
     # plot_path.mkdir(parents=True, exist_ok=True)

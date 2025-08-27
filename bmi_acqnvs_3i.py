@@ -5,7 +5,8 @@ from scipy.io import loadmat
 import time
 #import nidaqmx # may be for s = nidaqmx.Task()
 
-import save_files_3i
+from save_files_3i import save_files_3i
+from main_protocol import wait_for_reader
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio
@@ -15,37 +16,81 @@ from params.play_tone import play_tone
 from SBReadFile22.SBReadFile import *
 
 @contextmanager
-def on_cleanup(save_path, bData, debug_bool):
+def on_cleanup(save_path, data, bData):
     try:
         yield
     finally:
-        # The following is the clean_me_up():
-        #global pl, baseActivity
-        print('Cleaning')
-        # Should be equivalent to the mat files but in npz format (multiple arrays)
-        np.savez(f'{save_path}/BMI_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npz', data=data, bData=bData)
-        if not debug_bool:
-            print('disconnection')
-            #if pl.Connected():
-            #    pl.Disconnect()
+        print('Cleaning...')
+        np.savez(save_path, data=data, bData=bData)
+
+def allocate(shape, fill, dtype):
+    if fill == "nan":
+        return np.full(shape, np.nan, dtype=dtype)
+    elif fill == "zero":
+        return np.zeros(shape, dtype=dtype)
+    else:
+        raise ValueError(f"Unknown fill type: {fill}")
+
+def init_data(expected_expt_length, number_neurons, vector_stim, debug_bool=False):
+    data = {}
+    # --- schema for arrays ---
+    schema = {
+        # name       : (shape, fill, dtype)
+        "cursor"    : ((expected_expt_length,), "nan", np.float32),
+        "fb_freq"   : ((expected_expt_length,), "nan", np.float32),
+        "bmi_act"   : ((number_neurons, expected_expt_length), "nan", np.float32),
+        "base_vector":((number_neurons, expected_expt_length), "nan", np.float32),
+        "self_hits" : ((expected_expt_length,), "zero", np.float32),
+        "self_dr_stim":((expected_expt_length,), "zero", np.float32),
+        "vector_water":((expected_expt_length,), "zero", np.float32),
+        "random_dr_stim":((expected_expt_length,), "zero", np.float32),
+        "trial_start":((expected_expt_length,), "zero", np.float32),
+        "time_vector":((expected_expt_length,), "nan", np.float32),  # debugging
+    }
+    # --- schema for debug arrays ---
+    debug_schema = {
+        "fsmooth"   : ((number_neurons, expected_expt_length), "nan", np.float32),
+        "dff"       : ((number_neurons, expected_expt_length), "nan", np.float32),
+        "c1_bool"   : ((expected_expt_length,), "nan", np.float32),
+        "c2_val"    : ((expected_expt_length,), "nan", np.float32),
+        "c2_bool"   : ((expected_expt_length,), "nan", np.float32),
+        "c3_val"    : ((expected_expt_length,), "nan", np.float32),
+        "c3_bool"   : ((expected_expt_length,), "nan", np.float32),
+    }
+
+    # fill main arrays
+    for key, (shape, fill, dtype) in schema.items():
+        data[key] = allocate(shape, fill, dtype)
+    # fill debug arrays if enabled
+    if debug_bool:
+        for key, (shape, fill, dtype) in debug_schema.items():
+            data[key] = allocate(shape, fill, dtype)
+
+    # attach external vector
+    data["vector_stim"] = vector_stim # To debug, TODO: Remove after debugging
+    # counters and flags
+    data.update({
+        "self_target_counter": 0,
+        "self_target_dr_stim_counter": 0,
+        "sched_random_stim": 0,
+        "water_counter": 0,
+        "trial_counter": 0,  # TODO: Remove one
+    })
+
+    return data
 
 def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
     # Load flag configuration file
     flags = get_flags()[expt_str]
-    flag_bmi = flags['BMI_stim']
-    flag_dr_stim = flags['DRstim']
-    flag_stim_random = flags['StimRandom']
-    flag_water = flags['Water']
 
     # BMI parameters
     tset['im']['frame_rate'] = 30
     relaxation_time = 0 # there can't be another hit in this many sec
 
     # Values of parameters in frames
-    experiment_length = 60*30*tset['im']['frame_rate'] # in frames
+    expected_expt_length = 60*30*tset['im']['frame_rate'] # in frames
     relaxation_frames = round(relaxation_time*tset['im']['frame_rate'])
     
-    #bdata = load(fullfile(baseline_calib_file)) - assuming this is a mat file
     bdata = np.load(baseline_calib_file, allow_pickle=True)
     back2base = 1/2*bdata['t1'];
 
@@ -53,36 +98,35 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     # ** ** ** ** ** ** ** ** ** Initialization of BMI acquisition ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
     # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
 
-    #global pl, data
     number_neurons = len(bdata['E_id'])
 
     # Pre-allocating arrays
     fbuffer = np.full((number_neurons, tset['dff_win']), np.nan, dtype=np.float32)
+    data = init_data(expected_expt_length, number_neurons, vector_stim, debug_bool=True)
 
-    #expected_length_experiment = int(np.ceil(experiment_length)) # unknown use
-
+    '''
     data = {}
-    data['cursor'] = np.full(experiment_length, np.nan, dtype=np.float32)
-    data['fb_freq'] = np.full(experiment_length, np.nan, dtype=np.float32)
-    data['bmi_act'] = np.full((number_neurons, experiment_length), np.nan, dtype=np.float32)
-    data['base_vector'] = np.full((number_neurons, experiment_length), np.nan, dtype=np.float32)
-    data['self_hits'] = np.zeros(experiment_length, dtype=np.float32)
-    data['self_dr_stim'] = np.zeros(experiment_length, dtype=np.float32)
+    data['cursor'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+    data['fb_freq'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+    data['bmi_act'] = np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float32)
+    data['base_vector'] = np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float32)
+    data['self_hits'] = np.zeros(expected_expt_length, dtype=np.float32)
+    data['self_dr_stim'] = np.zeros(expected_expt_length, dtype=np.float32)
     data['vector_stim'] = vector_stim
-    data['vector_water'] = np.zeros(experiment_length, dtype=np.float32)
-    data['random_dr_stim'] = np.zeros(experiment_length, dtype=np.float32)
-    data['trial_start'] = np.zeros(experiment_length, dtype=np.float32)
+    data['vector_water'] = np.zeros(expected_expt_length, dtype=np.float32)
+    data['random_dr_stim'] = np.zeros(expected_expt_length, dtype=np.float32)
+    data['trial_start'] = np.zeros(expected_expt_length, dtype=np.float32)
     # To debug, TODO: Remove after debugging
-    data['time_vector'] = np.full(experiment_length, np.nan, dtype=np.float32)
+    data['time_vector'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
 
     if debug_bool:
-        data['fsmooth'] = np.full((number_neurons, experiment_length), np.nan, dtype=np.float32)
-        data['dff'] = np.full((number_neurons, experiment_length), np.nan, dtype=np.float32)
-        data['c1_bool'] = np.full(experiment_length, np.nan, dtype=np.float32)
-        data['c2_val'] = np.full(experiment_length, np.nan, dtype=np.float32)
-        data['c2_bool'] = np.full(experiment_length, np.nan, dtype=np.float32)
-        data['c3_val'] = np.full(experiment_length, np.nan, dtype=np.float32)
-        data['c3_bool'] = np.full(experiment_length, np.nan, dtype=np.float32)
+        data['fsmooth'] = np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float32)
+        data['dff'] = np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float32)
+        data['c1_bool'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+        data['c2_val'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+        data['c2_bool'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+        data['c3_val'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
+        data['c3_bool'] = np.full(expected_expt_length, np.nan, dtype=np.float32)
 
     # Initializing general flags and counters
     data['self_target_counter'] = 0
@@ -91,6 +135,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     data['water_counter'] = 0
 
     data['trial_counter'] = 0  # TODO: Remove one
+    '''
     trial_flag = 1
     non_buffer_update_counter = tset['prefix_win']  # Counter when we don't want to update the buffer
     init_frame_base = non_buffer_update_counter + 1
@@ -103,87 +148,64 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     back2base_counter = 0
     back2baseline_flag = 0
 
-    # Cleaning 
-    with on_cleanup(path_data['save_path'], bdata, debug_bool):
-        # To prepare nidaq - not needed
-        # extract info for channel
-        '''
+    # Save path
+    bmi_data_path = path_data['save_path'] / f'BMI_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
+
+    data['frame'] = 1
+    counter_same = 0  # Counts how many frames are the same as the past
+    counter_same_thresh = 500
+    base_buffer_full = False  # Boolean indicating if the fbuffer is filled
+    # Upon termination (including interruption) of the following code, data will be saved
+    with on_cleanup(bmi_data_path, data, bdata):
         if not debug_bool:
-            # Clear the previous session if it exists
-            try:
-                s.close()
-            except:
-                pass
-
-            s = nidaqmx.Task()  # Create a new DAQmx task
-            s.do_channels.add_do_chan('Dev6/port0/line0:2', line_grouping=LineGrouping.CHAN_PER_LINE)
-
-            ni_out = [0, 0, 0]
-            s.write(ni_out)  # Set the initial state
-            ni_getimage = [0, 1, 0] # Capture from green channel?
-        '''
-
-        # Prepare for 3i
-        if not debug_bool:
-            # The following connection to 3i might not exist
-            # Connection to Prairie
-            sb_file_reader = SBReadFile()
-            if not sb_file_reader.Open(sldy_dir):
-                print('.sldy file not found')
-                exit(1)
-
-            # Prairie variables
-            px = sb_file_reader.GetNumXColumns(0)
-            py = sb_file_reader.GetNumYRows(0)
-
-            # Unsure if the following Prairie commands are necessary
-            '''
-            # Prairie commands
-            pl.SendScriptCommands('-srd True 0')
-            pl.SendScriptCommands('-lbs True 0')
-
-            # Set the environment for the Time Series in PrairieView
-            load_command = f'-tsl {path_data["bmi_env"]}'
-            pl.SendScriptCommands(load_command)
-            '''
-
-            # Set the path where to store the imaging data - SetSavePath (-p) "path" ["addDateTime"]
-            save_files_3i(path_data["save_path"], '', expt_str)
-        else:
-            # Not sure if the px and py can be changed
-            px = 512
-            py = 512
-
-        last_frame = np.zeros((px, py))
-
-        # Load masks
-        if not debug_bool:
-            strc_mask = np.load(f'{path_data["save_path"]}/strc_mask.npy', allow_pickle=True).item()
-
-        if not debug_bool:
-            time.sleep(2)
-            #pl.SendScriptCommands('-ts')
-            time.sleep(2)  # Empirically discovered time for the Prairie to start gears
-
-        data["frame"] = 1
+            sb_file_reader = wait_for_reader(sldy_path)
+            save_files_3i(path_data['save_path'], '', expt_str)
+            strc_mask = np.load(path_data['save_path'] / 'strc_mask.npy', allow_pickle=True).item()
 
         # Give random reward to trigger the jetball
-        # Unknown how this will be done or what it does
         '''
         a.write_digital("D9", 1)
         time.sleep(1)
         a.write_digital("D9", 0)
         '''
-        print('STARTING RECORDING!!!')
 
-        counter_same = 0  # Counts how many frames are the same as the past
-        counter_same_thresh = 500
-        base_buffer_full = False  # Boolean indicating if the fbuffer is filled
-        capture = 2 # This capture should be the third within the slide - first = init for roi detection, second=baseline, third=bmi
+        init_time_point = 0
+        sleep_time = 0.001  # 10 ms (consider no sleep)
+        capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide - first = init for roi detection, second=baseline, third=bmi
+        time_point_count = sb_file_reader.GetNumTimepoints(capture)
         plane_count = sb_file_reader.GetNumZPlanes(capture)
         z_plane = int(plane_count/2)
 
+        print('STARTING RECORDING!!!')
         print('baseBuffer filling!...')
+
+        for the_retry in range(0, 500):  # Will run for 500 frames
+            for time_point in range(init_time_point, time_point_count):
+                # Loop exit condition
+                if debug_bool and data['frame'] > debug_input.shape[1]:
+                    break
+
+                start_time = time.perf_counter()
+                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, tset['im']['chan_data']['chan_idx'], True)
+
+
+                # Check for new timepoints
+                sb_file_reader.Refresh(capture)
+                if init_time_point == time_point_count:
+                    no_progress_counter += 1
+                else:
+                    no_progress_counter = 0
+                time.sleep(sleep_time)
+                print(no_progress_counter)
+
+                # If we have waited too long, quit
+                if no_progress_counter * sleep_time > max_wait:
+                    break
+
+                # Loop again
+                init_time_point = time_point_count
+                time_point_count = sb_file_reader.GetNumTimepoints(capture)
+
         while (not debug_bool and counter_same < counter_same_thresh) or (debug_bool and data['frame'] <= debug_input.shape[1]):
             if not debug_bool:
                 #im = pl.GetImage_2(tset['im']['chan_data']['chan_idx'], px, py)
@@ -279,13 +301,13 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                                     data['self_hits'][data['frame']] = 1
                                     print(f'Trial: {data["trial_counter"]}, Num Self Hits: {data["self_target_counter"]}')
 
-                                    if flag_bmi:
-                                        if flag_dr_stim:
+                                    if flags['BMI_stim']:
+                                        if flags['DRstim']:
                                             deliver_stim = 1
                                             data['self_target_dr_stim_counter'] += 1
                                             data['self_dr_stim'][data['frame']] = 1
                                             print(f'Trial: {data["trial_counter"]}, DR STIMS: {data["self_target_dr_stim_counter"]}')
-                                        if flag_water:
+                                        if flags['Water']:
                                             deliver_water = 1
                                             data['water_counter'] += 1
                                             data['vector_water'][data['frame']] = 1
@@ -298,7 +320,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                                         buffer_update_counter = relaxation_frames
                                         back2baseline_flag = True
                                         trial_flag = True
-                                if not trial_flag and flag_stim_random:
+                                if not trial_flag and flags['StimRandom']:
                                     if data['frame'] in data['vector_stim']:
                                         deliver_stim = 1
                                         print('SCHEDULED DR STIM')

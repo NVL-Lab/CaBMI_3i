@@ -1,6 +1,7 @@
 author_= 'Saul Gurgua Lopez'
 
 import sys
+import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
@@ -17,13 +18,12 @@ from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_c
 from rois.delete_roi_2chan import delete_roi_2chan
 from rois.draw_roi_g_chan import draw_roi_g_chan
 from baseline_acqnvs_3i import baseline_acqnvs_3i
-
 from plots.plot_neurons_baseline import plot_neurons_baseline
 from plots.plot_neurons_ensemble import plot_neurons_ensemble
 from rois.select_roi_data import select_roi_data
 from calibration.baseline2target import baseline2target
 from params.create_vector_random_stim import get_random_stim
-
+from params.play_tone import play_tone
 from bmi_acqnvs_3i import bmi_acqnvs_3i
 from check_motor_behavior import check_motor_behavior
 
@@ -34,8 +34,27 @@ from check_motor_behavior import check_motor_behavior
     On Slidebook, create new slide
 '''
 
+def wait_for_reader(file_path, wait_seconds=500):
+    for attempt in range(wait_seconds):
+        if file_path.exists():
+            try:
+                reader = SBReadFile()
+                reader.Open(str(file_path), All=False)
+                return reader
+            except FileNotFoundError:
+                print(f"Attempt {attempt + 1}: file not ready, retrying...")
+        else:
+            if attempt == 0:
+                print(
+                    f"Input file does not exist. Retrying for up to {wait_seconds} seconds\n"
+                    "Press Ctrl+C to exit."
+                )
+        time.sleep(1)
+    print("Giving up.")
+    sys.exit(1)
+
 if __name__ == '__main__':
-    sldy_dir = Path(sys.argv[1]) # Do not convert dir to a Path object -> error with 3i code
+    sldy_path = Path(sys.argv[1]) # Do not convert dir to a Path object -> error with 3i code
     exp_info = get_exp_info()
     save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     #save_path.mkdir(parents=True, exist_ok=True)
@@ -51,24 +70,7 @@ if __name__ == '__main__':
     print(path_data)
 
     # Opening of sldy information
-    wait_counter = 500
-    for the_try in range(1, wait_counter):
-        if sldy_dir.exists():
-            try:
-                sb_file_reader = SBReadFile()
-                sb_file_reader.Open(str(sldy_dir), All=False)
-                break
-            except:
-                time.sleep(1)
-                print(the_try, "...")
-                continue
-        elif the_try == 1:
-            print('Input file does not exist, retrying for up to ', wait_counter, ' seconds\nOr hit Ctrl+c to exit')
-        if the_try == wait_counter - 1:
-            print('Giving up')
-            exit(1)
-        time.sleep(1)
-        print(the_try, "...")
+    sb_file_reader = wait_for_reader(sldy_path)
 
     '''
     print(SBFileReader.GetNumCaptures())
@@ -195,7 +197,8 @@ if __name__ == '__main__':
         plt.show()
 
     # Save roi_data
-    # np.savez(save_path/'roi_data.npz', plot_images=plot_images, roi_data=roi_data, allow_pickle=True)')
+    roi_data_path = save_path/'roi_data.npz'
+    #np.savez(roi_data_path, plot_images=plot_images, roi_data=roi_data, allow_pickle=True)
 
     # Baseline acquisition
     bdata_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set)
@@ -228,7 +231,7 @@ if __name__ == '__main__':
     reward_per_frame_range = 1. / frames_per_reward_range
 
     # STOPPED - CONTINUE HERE
-    target_info_path, target_cal_all_path, fb_cal = baseline2target(n_f_file, roi_data_file, e1_base, e2_base, frames_per_reward_range, task_set, save_path, fb_set)
+    target_info_path, target_cal_all_path, fb_cal = baseline2target(bdata_path, roi_data_path, e1_base, e2_base, frames_per_reward_range, task_set, save_path, fb_set)
 
     # Define the experiment length based on frame rate
     experiment_length = 30 * 60 * task_set['im']['frame_rate']
@@ -237,9 +240,9 @@ if __name__ == '__main__':
     vector_stim, isi = get_random_stim(task_set['im']['frameRate'], experiment_length, task_set['rs']['IHSImean'], task_set['rs']['IHSIrange'], False)
 
     # Set the seed for baseline
-    seedBase = 0
-    if not seedBase:
-        vector_stim += task_set.f0_win
+    seed_base = 0
+    if not seed_base:
+        vector_stim += task_set['f0_win']
 
     # Run BMI (Brain-Machine Interface) Experiment
     # --------------------------------------------------
@@ -261,8 +264,7 @@ if __name__ == '__main__':
         fb_freq_i = 7000
         fb_set['arduino']['duration'] = 1
         # Should change fbset['arduino']['duration'] to not include 'arduino' as a key
-        play_tone(fb_freq_i, fbset['arduino']['duration']) #This will be changed and will use the MiceBall/RATBALL code, which has tone code
-        #playTone(a, fbset['arduino']['pin'], fb_freq_i, fbset['arduino']['duration'])
+        play_tone(fb_freq_i, fb_set['arduino']['duration']) #This will be changed and will use the MiceBall/RATBALL code, which has tone code
 
     # Set up base_val_seed for the BMI experiment
     base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan
@@ -272,11 +274,11 @@ if __name__ == '__main__':
     plt.imshow(im_bg)
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_acqnvs_3i(path_data, expt_str, target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal)
+    bmi_acqnvs_3i(path_data, exp_info['expt'], target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal)
 
     # D0:
     # 1) Save the workspace in folder
     # 2) Save this protocol script in the folder (savePath)
 
     # If motor behavior experiment, run this
-    check_motor_behavior(path_data, task_set, expt_str)
+    check_motor_behavior(path_data, task_set, exp_info['expt'])

@@ -52,7 +52,7 @@ def get_bmi_settings(fr = 29.752) -> dict:
         'range_norm_bool': True,
         'cursor_zscore_bool': False,
         'reward_delay_frames': 10,
-        'back2BaseFrameThresh': 2,   #2 frames of back2base
+        'back2base_frame_thresh': 2,   #2 frames of back2base
         'relaxationTime': 0,         # Period after a hit to stop the BMI
         'b2base_coeff': 0.5,
 

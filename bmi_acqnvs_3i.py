@@ -1,12 +1,9 @@
 from datetime import datetime
 from contextlib import contextmanager
 import numpy as np
-from scipy.io import loadmat
 import time
-#import nidaqmx # may be for s = nidaqmx.Task()
 
 from save_files_3i import save_files_3i
-from main_protocol import wait_for_reader
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio
@@ -79,7 +76,7 @@ def init_data(expected_expt_length, number_neurons, vector_stim, debug_bool=Fals
 
     return data
 
-def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
+def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal, sb_file_reader) -> None:
     # Load flag configuration file
     flags = get_flags()[expt_str]
 
@@ -92,7 +89,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     relaxation_frames = round(relaxation_time*tset['im']['frame_rate'])
     
     bdata = np.load(baseline_calib_file, allow_pickle=True)
-    back2base = 1/2*bdata['t1'];
+    back2base = 1/2*bdata['t1']
 
     # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
     # ** ** ** ** ** ** ** ** ** Initialization of BMI acquisition ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
@@ -142,8 +139,8 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     # Beginning of experiment and VTA stim
     buffer_update_counter = 0
 
-    deliver_water = 0
-    deliver_stim = 0
+    deliver_stim = 0  # Light stimulation
+    deliver_water = 0 # Reward feedback
 
     back2base_counter = 0
     back2baseline_flag = 0
@@ -151,14 +148,15 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
     # Save path
     bmi_data_path = path_data['save_path'] / f'BMI_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
 
+    #counter_same = 0  # Counts how many frames are the same as the past
+    #counter_same_thresh = 500
     data['frame'] = 1
-    counter_same = 0  # Counts how many frames are the same as the past
-    counter_same_thresh = 500
     base_buffer_full = False  # Boolean indicating if the fbuffer is filled
+    max_wait = 5  # seconds
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bmi_data_path, data, bdata):
         if not debug_bool:
-            sb_file_reader = wait_for_reader(sldy_path)
+            #sb_file_reader = wait_for_reader(sldy_path)
             save_files_3i(path_data['save_path'], '', expt_str)
             strc_mask = np.load(path_data['save_path'] / 'strc_mask.npy', allow_pickle=True).item()
 
@@ -171,7 +169,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
         init_time_point = 0
         sleep_time = 0.001  # 10 ms (consider no sleep)
-        capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide - first = init for roi detection, second=baseline, third=bmi
+        capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide
         time_point_count = sb_file_reader.GetNumTimepoints(capture)
         plane_count = sb_file_reader.GetNumZPlanes(capture)
         z_plane = int(plane_count/2)
@@ -188,6 +186,150 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                 start_time = time.perf_counter()
                 image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, tset['im']['chan_data']['chan_idx'], True)
 
+                # ---- ROI extraction ----
+                unit_vals = debug_input[:, data['frame']] if debug_bool else get_roi(image, strc_mask)
+                data['bmi_act'][:, data['frame']] = unit_vals
+
+                # Efficient ring buffer (no manual shifting)
+                fbuffer = np.roll(fbuffer, -1, axis=1)
+                fbuffer[:, -1] = unit_vals
+
+                # ---- Baseline calculation ----
+                if data['frame'] == init_frame_base:
+                    if not np.isnan(np.sum(base_val_seed)):
+                        base_val = base_val_seed.copy()
+                        base_buffer_full = True
+                        print("baseBuffer seeded!")
+                    else:
+                        base_val = np.ones(number_neurons, dtype=np.float32) * unit_vals / tset['f0_win']
+
+                elif not base_buffer_full and data['frame'] <= (init_frame_base + tset['f0_win']):
+                    base_val += unit_vals / tset['f0_win']
+                    if data['frame'] == (init_frame_base + tset['f0_win']):
+                        base_buffer_full = True
+                        print("baseBuffer FULL!")
+
+                else:
+                    # rolling baseline
+                    base_val = (base_val * (tset['f0_win'] - 1) + unit_vals) / tset['f0_win']
+
+                data['base_vector'][:, data['frame']] = base_val
+
+                # ---- Signal processing ----
+                fsmooth = np.nanmean(fbuffer, axis=1, dtype=np.float32)
+                if debug_bool:
+                    data['fsmooth'][:, data['frame']] = fsmooth
+
+                if base_buffer_full:
+                    dff = (fsmooth - base_val) / base_val
+                    cursor_i, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool = dff2cursor_target(
+                        dff, bdata, tset['cursor_zscore_bool']
+                    )
+                    data['cursor'][data['frame']] = cursor_i
+                    print(f"Cursor: {cursor_i}")
+
+                    if debug_bool:
+                        data['dff'][:, data['frame']] = dff
+                        data['c1_bool'][data['frame']] = c1_bool
+                        data['c2_val'][data['frame']] = c2_val
+                        data['c2_bool'][data['frame']] = c2_bool
+                        data['c3_val'][data['frame']] = c3_val
+                        data['c3_bool'][data['frame']] = c3_bool
+
+                    # feedback frequency
+                    fb_freq_i = cursor2audio(cursor_i, fb_cal)
+                    data['fb_freq'][data['frame']] = fb_freq_i
+
+                    if fb_bool and not debug_bool:
+                        play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
+
+                    # ---- Trial logic ----
+                    if buffer_update_counter == 0:
+                        if trial_flag and not back2baseline_flag:
+                            data['trialStart'][data['frame']] = 1
+                            data['trialCounter'] += 1
+                            trial_flag = False
+                            print("New Trial!")
+
+                        if back2baseline_flag:
+                            if data['cursor'][data['frame']] <= back2base:
+                                back2base_counter += 1
+                            if back2base_counter >= tset['back2base_frame_thresh']:
+                                back2baseline_flag = False
+                                back2base_counter = 0
+                                print("back to baseline")
+                        elif target_hit:
+                            print("target hit")
+                            data['self_target_counter'] += 1
+                            data['self_hits'][data['frame']] = 1
+                            print(f"Trial: {data['trial_counter']}, Num Self Hits: {data['self_target_counter']}")
+
+                            if flags['BMI_stim']:
+                                if flags['DRstim']:
+                                    deliver_stim = 1
+                                    data['self_target_dr_stim_counter'] += 1
+                                    data['self_dr_stim'][data['frame']] = 1
+                                    print(
+                                        f"Trial: {data['trial_counter']}, DR STIMS: {data['self_target_dr_stim_counter']}")
+
+                                if flags['Water']:
+                                    deliver_water = 1
+                                    data['water_counter'] += 1
+                                    data['vector_water'][data['frame']] = 1
+                                    print(f"Trial: {data['trial_counter']}, Water: {data['water_counter']}")
+
+                                print("Target Achieved! (self-target)")
+
+                                if not debug_bool:
+                                    print("RewardTone delivery!")
+                        buffer_update_counter = relaxation_frames
+                        back2baseline_flag = True
+                        trial_flag = True
+
+                    elif not trial_flag and flags['StimRandom'] and data['frame'] in data['vector_stim']:
+                        deliver_stim = 1
+                        print("SCHEDULED DR STIM")
+                        data['sched_random_stim'] += 1
+                        data['random_dr_stim'][data['frame']] = 1
+                    else:
+                        buffer_update_counter -= 1
+
+                # ---- Reward delivery ----
+                if deliver_water:
+                    print('Delivering water...')
+                    if not debug_bool:
+                        #a.write_digital("D9", 1)
+                        time.sleep(1)
+                        #a.write_digital("D9", 0)
+                    deliver_water = 0
+                    print('Water delivered!')
+
+                if deliver_stim:
+                    print('Stimulating...')
+                    if tset['delay_flag']:
+                        time.sleep(tset['delay_time'])
+                    if not debug_bool:
+                        # Blue light
+                        #a.write_digital("D5", 1)
+                        time.sleep(0.2)
+                        #a.write_digital("D5", 0)
+                        # UV light
+                        #a.write_digital("D3", 1)
+                        time.sleep(1)
+                        #a.write_digital("D3", 0)
+                    deliver_stim = 0
+                    print('Light stimulation delivered!')
+
+                # ---- Advance frame ----
+                data['frame'] += 1
+                data['time_vector'][data['frame']] = time.time() - start_time
+
+                # ---- Timing sync ----
+                if not debug_bool:
+                    target_dt = 1 / (tset['im']['frame_rate'] * 1.2)
+                    sleep_dur = target_dt - data['time_vector'][data['frame']]
+                    if sleep_dur > 0:
+                        time.sleep(sleep_dur)
 
                 # Check for new timepoints
                 sb_file_reader.Refresh(capture)
@@ -205,7 +347,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                 # Loop again
                 init_time_point = time_point_count
                 time_point_count = sb_file_reader.GetNumTimepoints(capture)
-
+'''
         while (not debug_bool and counter_same < counter_same_thresh) or (debug_bool and data['frame'] <= debug_input.shape[1]):
             if not debug_bool:
                 #im = pl.GetImage_2(tset['im']['chan_data']['chan_idx'], px, py)
@@ -218,13 +360,11 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                 start_time = time.perf_counter()
 
                 # What is this for?
-                '''
-                if not debug_bool:
-                    last_frame = im  # Comparison and assignment takes ~4ms
-                    s.write(ni_getimage)
-                    time.sleep(0.001)
-                    s.write([0, 0, 0])
-                '''
+                #if not debug_bool:
+                #    last_frame = im  # Comparison and assignment takes ~4ms
+                #    s.write(ni_getimage)
+                #    time.sleep(0.001)
+                #    s.write([0, 0, 0])
 
                 if non_buffer_update_counter == 0:
                     if not debug_bool:
@@ -362,3 +502,4 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                         time.sleep(1 / (tset['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
                 else:
                     counter_same += 1
+'''

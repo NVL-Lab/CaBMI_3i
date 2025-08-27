@@ -3,7 +3,6 @@ from datetime import datetime
 import numpy as np
 from contextlib import contextmanager
 
-from params.play_tone import play_tone
 from save_files_3i import save_files_3i
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
@@ -21,19 +20,12 @@ def on_cleanup(save_path, base_activity):
         # consider storing everything under an npz
         np.save(save_path, base_activity=base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(path_data, roi_mask, tset):
+def baseline_acqnvs_3i(path_data, roi_mask, tset, sb_file_reader):
     dilation_factor = 2
     expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frameRate'] * dilation_factor))
 
     # Save path
     bdata_path = path_data['save_path'] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
-
-    '''
-    sb_file_reader = SBReadFile()
-    if not sb_file_reader.Open(sldy_dir):
-        print('.sldy file not found')
-        exit(1)
-    '''
     save_path_3i = path_data['save_path'] / 'im'
     # save_path_3i.mkdir(parents=True, exist_ok=True)
     # save_files_3i(path_data['save_path'], '', 'baseline')

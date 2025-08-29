@@ -51,18 +51,14 @@ if __name__ == '__main__':
     task_set = get_bmi_settings()
     exp_info = get_exp_info()
 
-    # Initialize saving directory
-    save_path = Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
-    #save_path.mkdir(parents=True, exist_ok=True)
-
     # Storing path and environment data
     path_data = {
         'sldy_path': Path(exp_info['sldy_dir_winsave']),
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
-        'save_path': save_path,
-        'im': save_path / 'im'
+        'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     }
+    #path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
     # Initializing slidebook object
@@ -71,13 +67,14 @@ if __name__ == '__main__':
     '''
         ROI Acquisition
     '''
-    roi_data = roi_acqnvs_3i(sb_file_reader, task_set, save_path, True, True)
+    roi_data, im_bg = roi_acqnvs_3i(sb_file_reader, 0, task_set, path_data, True, True)
+    # maybe return path to load
 
     '''
         Baseline Acquisition
     '''
-    bdata_path = baseline_acqnvs_3i(path_data, roi_data['roi_mask'], task_set, sb_file_reader)
-    bdata = np.load(bdata_path, allow_pickle=True)
+    bdata = baseline_acqnvs_3i(sb_file_reader, 1, task_set, path_data, roi_data['roi_mask'], True)
+    # maybe return path to load
 
     # Plot neurons from baseline
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
@@ -106,7 +103,7 @@ if __name__ == '__main__':
     reward_per_frame_range = 1. / frames_per_reward_range
 
     # STOPPED - CONTINUE HERE
-    target_info_path, target_cal_all_path, fb_cal = baseline2target(bdata_path, roi_data_path, e1_base, e2_base, frames_per_reward_range, task_set, save_path, fb_set)
+    target_info_path, target_cal_all_path, fb_cal = baseline2target(bdata, roi_data, e1_base, e2_base, frames_per_reward_range, task_set, path_data['save_path'], fb_set)
 
     # Define the experiment length based on frame rate
     experiment_length = 30 * 60 * task_set['im']['frame_rate']

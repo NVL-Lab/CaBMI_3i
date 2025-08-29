@@ -76,7 +76,7 @@ def init_data(expected_expt_length, number_neurons, vector_stim, debug_bool=Fals
 
     return data
 
-def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal, sb_file_reader) -> None:
+def bmi_acqnvs_3i(sb_file_reader, capture, path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
     # Load flag configuration file
     flags = get_flags()[expt_str]
 
@@ -169,7 +169,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
         init_time_point = 0
         sleep_time = 0.001  # 10 ms (consider no sleep)
-        capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide
+        #capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide
         time_point_count = sb_file_reader.GetNumTimepoints(capture)
         plane_count = sb_file_reader.GetNumZPlanes(capture)
         z_plane = int(plane_count/2)
@@ -296,7 +296,7 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
 
                 # ---- Reward delivery ----
                 if deliver_water:
-                    print('Delivering water...')
+                    print('Delivering water...') # With custom thing, which should be controlled by computer
                     if not debug_bool:
                         #a.write_digital("D9", 1)
                         time.sleep(1)
@@ -347,6 +347,8 @@ def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, d
                 # Loop again
                 init_time_point = time_point_count
                 time_point_count = sb_file_reader.GetNumTimepoints(capture)
+
+    return np.load(bmi_data_path)
 '''
         while (not debug_bool and counter_same < counter_same_thresh) or (debug_bool and data['frame'] <= debug_input.shape[1]):
             if not debug_bool:

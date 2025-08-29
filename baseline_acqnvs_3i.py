@@ -10,7 +10,7 @@ from params.play_tone import play_tone
 from SBReadFile22.SBReadFile import *
 
 @contextmanager
-def on_cleanup(save_path, base_activity):
+def on_cleanup(bdata_path, base_activity):
     try:
         yield
     except KeyboardInterrupt:
@@ -18,17 +18,24 @@ def on_cleanup(save_path, base_activity):
     finally:
         print('Cleaning...')
         # consider storing everything under an npz
-        np.save(save_path, base_activity=base_activity, allow_pickle=True)
+        np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(path_data, roi_mask, tset, sb_file_reader):
-    dilation_factor = 2
-    expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frameRate'] * dilation_factor))
-
+def baseline_acqnvs_3i(sb_file_reader, capture, path_data, roi_mask, tset, run=False) -> np.array:
     # Save path
     bdata_path = path_data['save_path'] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
+    if not run:
+        try:
+            bdata = np.load(bdata_path, allow_pickle=True)
+            return bdata
+        except FileNotFoundError:
+            print('Baseline data not found. Please run baseline_acqnvs_3i.')
+            exit(1)
     save_path_3i = path_data['save_path'] / 'im'
     # save_path_3i.mkdir(parents=True, exist_ok=True)
     # save_files_3i(path_data['save_path'], '', 'baseline')
+
+    dilation_factor = 2
+    expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frameRate'] * dilation_factor))
 
     # Initialize baseline variables
     number_neurons = int(np.max(roi_mask))
@@ -36,7 +43,6 @@ def baseline_acqnvs_3i(path_data, roi_mask, tset, sb_file_reader):
     base_activity = np.full((number_neurons, expected_length), np.nan)
 
     frame = 0
-    capture = sb_file_reader.GetNumCaptures() - 1  # This capture should be the second within the slide -> 1
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
@@ -109,4 +115,4 @@ def baseline_acqnvs_3i(path_data, roi_mask, tset, sb_file_reader):
 
     print('Finished baseline acquisition')
     play_tone(7000, 1)
-    return bdata_path
+    return np.load(bdata_path, allow_pickle=True)

@@ -9,10 +9,9 @@ from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_c
 from rois.delete_roi_2chan import delete_roi_2chan
 from rois.draw_roi_g_chan import draw_roi_g_chan
 
-def roi_acqnvs_3i(sb_file_reader, task_set, save_path, see_roi_data_flag=False, run=False) -> np.array:
+def roi_acqnvs_3i(sb_file_reader, capture, task_set, path_data, see_roi_data_flag=False, run=False) -> np.array:
 
-    roi_data_path = save_path / 'roi_data.npz'
-
+    roi_data_path = path_data['save_path'] / 'roi_data.npz'
     if not run:
         try :
             roi_data = np.load(roi_data_path, allow_pickle=True)
@@ -23,7 +22,7 @@ def roi_acqnvs_3i(sb_file_reader, task_set, save_path, see_roi_data_flag=False, 
 
     # Single image is used to locate ROIs
     # first = roi detect capture, second=baseline recording, third=bmi recording, fourth=behavior recording
-    im_summary = sb_file_reader.ReadImagePlaneBuf(0,0,0,0,0,True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel, True for 2d array return
+    im_summary = sb_file_reader.ReadImagePlaneBuf(capture,0,0,0,0,True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel, True for 2d array return
 
     # Scale image to see ROIs better
     '''
@@ -118,4 +117,4 @@ def roi_acqnvs_3i(sb_file_reader, task_set, save_path, see_roi_data_flag=False, 
         plt.show()
 
     #np.savez(roi_data_path, plot_images=plot_images, roi_data=roi_data, allow_pickle=True)
-    return roi_data
+    return roi_data, im_bg

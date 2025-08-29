@@ -26,55 +26,37 @@ from check_motor_behavior import check_motor_behavior
     On Slidebook, create new slide
 '''
 
-def wait_for_reader(file_path, wait_seconds=500):
-    for attempt in range(wait_seconds):
-        if file_path.exists():
-            try:
-                reader = SBReadFile()
-                reader.Open(str(file_path), All=False)
-                return reader
-            except FileNotFoundError:
-                print(f"Attempt {attempt + 1}: file not ready, retrying...")
-        else:
-            if attempt == 0:
-                print(
-                    f"Input file does not exist. Retrying for up to {wait_seconds} seconds\n"
-                    "Press Ctrl+C to exit."
-                )
-        time.sleep(1)
-    print("Giving up.")
-    sys.exit(1)
-
 if __name__ == '__main__':
     # Acquire experiment settings
     fb_set = get_fb_settings()
-    task_set = get_bmi_settings()
+    task_set = get_bmi_settings(38.6)
     exp_info = get_exp_info()
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(exp_info['sldy_dir_winsave']),
+        'sldy_path': Path(exp_info['sldy_dir']),
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
         'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
     }
-    #path_data['save_path'].mkdir(parents=True, exist_ok=True)
+    path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
     # Initializing slidebook object
-    sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    sb_file_reader = None # This needs to be updated
 
     '''
         ROI Acquisition
     '''
-    roi_data, im_bg = roi_acqnvs_3i(sb_file_reader, 0, task_set, path_data, True, True)
+    roi_data, im_bg = roi_acqnvs_3i(sb_file_reader, 0, task_set, path_data, False, False)
     # maybe return path to load
 
     '''
         Baseline Acquisition
     '''
-    bdata = baseline_acqnvs_3i(sb_file_reader, 1, task_set, path_data, roi_data['roi_mask'], True)
+    bdata = baseline_acqnvs_3i(sb_file_reader, 4, task_set, path_data, roi_data['roi_mask'], True)
     # maybe return path to load
+    exit()
 
     # Plot neurons from baseline
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
@@ -115,6 +97,7 @@ if __name__ == '__main__':
     seed_base = 0
     if not seed_base:
         vector_stim += task_set['f0_win']
+    exit()
 
     '''
         Baseline Acquisition

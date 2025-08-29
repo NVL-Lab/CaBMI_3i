@@ -1,7 +1,8 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
-def plot_cursor_e1_e2_activity(cursor, e1, e2, n, e_id, e_color, offset=0) -> tuple[fig, list]:
+def plot_cursor_e1_e2_activity(cursor, e1, e2, n, e_id, e_color, offset=0) -> tuple[matplotlib.figure.Figure, list]:
     num_e1 = np.sum(e_id == 1)
     e1_sel = np.where(e_id == 1)[0]
     n_e1 = n[:, e1_sel]

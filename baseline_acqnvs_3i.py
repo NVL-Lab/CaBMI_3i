@@ -9,6 +9,8 @@ from rois.obtain_roi import get_roi
 from params.play_tone import play_tone
 from SBReadFile22.SBReadFile import *
 
+from wait_on_reader_3i import wait_for_reader
+
 @contextmanager
 def on_cleanup(bdata_path, base_activity):
     try:
@@ -20,7 +22,7 @@ def on_cleanup(bdata_path, base_activity):
         # consider storing everything under an npz
         np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(sb_file_reader, capture, path_data, roi_mask, tset, run=False) -> np.array:
+def baseline_acqnvs_3i(sb_file_reader, capture, tset, path_data, roi_mask, run=False) -> np.array:
     # Save path
     bdata_path = path_data['save_path'] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
     if not run:
@@ -30,12 +32,18 @@ def baseline_acqnvs_3i(sb_file_reader, capture, path_data, roi_mask, tset, run=F
         except FileNotFoundError:
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
             exit(1)
+
+    sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    while sb_file_reader.GetNumCaptures() < capture+1:
+        capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
+        sb_file_reader = wait_for_reader(path_data['sldy_path'])
+
     save_path_3i = path_data['save_path'] / 'im'
-    # save_path_3i.mkdir(parents=True, exist_ok=True)
-    # save_files_3i(path_data['save_path'], '', 'baseline')
+    save_path_3i.mkdir(parents=True, exist_ok=True)
+    #save_files_3i(path_data['save_path'], '', 'baseline')
 
     dilation_factor = 2
-    expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frameRate'] * dilation_factor))
+    expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frame_rate'] * dilation_factor))
 
     # Initialize baseline variables
     number_neurons = int(np.max(roi_mask))

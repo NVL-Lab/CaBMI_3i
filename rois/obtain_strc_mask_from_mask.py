@@ -16,7 +16,7 @@ def obtain_strc_mask_from_mask(mask):
         'minx': [],
         'maxy': [],
         'miny': [],
-        'neuronMask': [],
+        'neuron_mask': [],
         'xctr': [],
         'yctr': [],
         'width': [],

@@ -9,20 +9,28 @@ from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_c
 from rois.delete_roi_2chan import delete_roi_2chan
 from rois.draw_roi_g_chan import draw_roi_g_chan
 
+from wait_on_reader_3i import wait_for_reader
+
 def roi_acqnvs_3i(sb_file_reader, capture, task_set, path_data, see_roi_data_flag=False, run=False) -> np.array:
+
 
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
     if not run:
         try :
-            roi_data = np.load(roi_data_path, allow_pickle=True)
+            roi_data = np.load(roi_data_path, allow_pickle=True).items()
             return roi_data
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
 
+    sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    while sb_file_reader.GetNumCaptures() < capture+1:
+        capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
+        sb_file_reader = wait_for_reader(path_data['sldy_path'])
+
     # Single image is used to locate ROIs
     # first = roi detect capture, second=baseline recording, third=bmi recording, fourth=behavior recording
-    im_summary = sb_file_reader.ReadImagePlaneBuf(capture,0,0,0,0,True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel, True for 2d array return
+    im_summary = sb_file_reader.ReadImagePlaneBuf(capture,0,0,0,task_set['im']['chan_data']['chan_idx'],True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel (0=RFP, 1=GFP), True for 2d array return
 
     # Scale image to see ROIs better
     '''
@@ -116,5 +124,5 @@ def roi_acqnvs_3i(sb_file_reader, capture, task_set, path_data, see_roi_data_fla
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
 
-    #np.savez(roi_data_path, plot_images=plot_images, roi_data=roi_data, allow_pickle=True)
+    np.savez(roi_data_path, plot_images=plot_images, roi_data=roi_data, allow_pickle=True)
     return roi_data, im_bg

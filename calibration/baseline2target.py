@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import zscore
 from scipy.signal import convolve
 from rois import get_mask
-from cursor2audio import cursor2audio
+from .cursor2audio import cursor2audio
 from plots.plot_cursor_e1_e2_activity import plot_cursor_e1_e2_activity
 from plots.calc_psth import calc_psth
 from datetime import datetime

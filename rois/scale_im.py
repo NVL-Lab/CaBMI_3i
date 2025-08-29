@@ -1,6 +1,17 @@
 import numpy as np
 
 def scale_im(im, min_perc, max_perc):
+
+    '''
+    Rescales the pixel intensities of the image so that values between two specified percentiles ( min_perc and max_perc) are stretched to the range [0, 1].
+    This enhances contrast while suppressing extreme outliers.
+
+    :param im:
+    :param min_perc:
+    :param max_perc:
+    :return:
+    '''
+
     min_val = np.percentile(im, min_perc)
     im_s = im - min_val
     im_s[im_s < 0] = 0

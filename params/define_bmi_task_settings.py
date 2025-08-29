@@ -2,6 +2,7 @@ from pathlib import Path
 import math 
 
 def get_bmi_settings(fr = 29.752) -> dict:
+    # Prairie: 29.752
     return {
         #'baseline_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_baseline_15.env'),
         #'bmi_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_BMI_30.env'),
@@ -15,7 +16,7 @@ def get_bmi_settings(fr = 29.752) -> dict:
             'posz': 0,            # Position of Z if known
             'chan_data': {        # RGB; G is 2nd
                 'label': 'g',
-                'chan_idx': 2
+                'chan_idx': 1 #2
             }                 
         },
 

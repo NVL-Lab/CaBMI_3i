@@ -11,6 +11,8 @@ from SBReadFile22.SBReadFile import *
 
 from wait_on_reader_3i import wait_for_reader
 
+from matplotlib import pyplot as plt
+
 @contextmanager
 def on_cleanup(bdata_path, base_activity):
     try:
@@ -28,6 +30,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, run=False) -> np.
     if not run:
         try:
             bdata = np.load(bdata_path, allow_pickle=True)
+            print(f'Loading {bdata_path.name}')
             return bdata
         except FileNotFoundError:
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
@@ -56,40 +59,65 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, run=False) -> np.
     z_plane = int(plane_count / 2)
     init_time_point = 0
     no_progress_counter = 0
-    sleep_time = 0.001  # 10 ms (consider no sleep)
-    max_wait = 5  # seconds
+    sleep_time = 0.01  # 10 ms (consider no sleep) - 0.001
+    max_wait = 1  # seconds (old is 5 sec)
 
     print("Starting baseline acquisition")
     print(sb_file_reader.GetImageName(capture))
 
+    fig = plt.figure(0)
+    title = 'Timepoint: {tp:6d}'
+
+    prev_image = np.zeros((sb_file_reader.GetNumYRows(capture), sb_file_reader.GetNumXColumns(capture)))
+    read_break = False
+
+
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bdata_path, base_activity):
-        for the_retry in range(0, 500):  # Will run for 500 frames
+        for the_retry in range(0, 500):
             for time_point in range(init_time_point, time_point_count):
                 print(f'*** Time Point: {time_point + 1}')
                 start = time.perf_counter()
-                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, task_set['im']['chan_data']['chan_idx'], True)
+                # channel task_set['im']['chan_data']['chan_idx']
+                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, 0, True)
 
+                '''
+                if time_point % 2 == 0:
+                    if time_point == 0:
+                        img_artist = plt.imshow(image)
+                    else:
+                        img_artist.set_data(image)
+                    plt.draw()
+                    fig.canvas.flush_events()
+                    plt.title(title.format(tp=time_point), loc='left')
+                    try:
+                        plt.pause(0.01)
+                    except KeyboardInterrupt:
+                        print("Keyboard Interrupt")
+                        exit()
+                '''
                 # Store ROI data
+                '''
+                # does not work
                 unit_vals = get_roi(image, strc_mask)
                 base_activity[:, frame] = unit_vals
                 frame += 1
-
+                '''
                 end = time.perf_counter() - start
-                delay = max(0, (1 / (task_set['im']['frameRate'] * 1.2)) - end)
-                time.sleep(delay) # done in order to synchronize frame acquisition
 
             # Check for new timepoints
-            sb_file_reader.Refresh(capture)
-            if init_time_point == time_point_count:
-                no_progress_counter += 1
-            else:
-                no_progress_counter = 0
-            time.sleep(sleep_time)
-            print(no_progress_counter)
-
-            # If we have waited too long, quit
-            if no_progress_counter * sleep_time > max_wait:
+            sb_file_reader.Refresh(capture) # Takes ~4ms
+            n_time_point_count = sb_file_reader.GetNumTimepoints(capture)
+            # Checks refreshing > 1 sec then refreshing stops
+            refresh_start = time.perf_counter()
+            while n_time_point_count == time_point_count:
+                sb_file_reader.Refresh(capture)
+                n_time_point_count = sb_file_reader.GetNumTimepoints(capture)
+                if time.perf_counter() - refresh_start > max_wait:
+                    read_break = True
+                    break
+            # If refreshing was halted, acquisition stops entirely
+            if read_break:
                 break
 
             # Loop again

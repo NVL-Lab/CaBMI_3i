@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(exp_info['sldy_dir_macsave']),
+        'sldy_path': Path(exp_info['sldy_dir']),
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
         'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     '''
         Baseline Acquisition
     '''
-    bdata = baseline_acqnvs_3i(task_set, path_data, roi_info['roi_data'].item()['roi_mask'], 1, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_info['roi_data'].item()['roi_mask'], 10, True)
     # maybe return path to load
     exit()
 

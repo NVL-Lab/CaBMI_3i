@@ -15,6 +15,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     if not run:
         try:
             roi_data = np.load(roi_data_path, allow_pickle=True)
+            print(f'Loading {roi_data_path.name}')
             return roi_data
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')

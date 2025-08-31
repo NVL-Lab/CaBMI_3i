@@ -181,6 +181,20 @@ def main(argv):
                 time.sleep(theSleepS)
             print(theNoProgress)
 
+            '''
+            old pipeline code
+                        if init_time_point == time_point_count:
+                            no_progress_counter += 1
+                        else:
+                            no_progress_counter = 0
+                        #time.sleep(sleep_time)
+                        print(f'No Progress: {no_progress_counter}')
+
+                        # If we have waited too long, quit
+                        if no_progress_counter * sleep_time > max_wait or time_point == 500:
+                            break
+                        '''
+
             # if we have waited too long, quit
             if theNoProgress * theSleepS  > theMaxWaitS:
                 break

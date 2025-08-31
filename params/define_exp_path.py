@@ -4,8 +4,8 @@ def get_exp_info() -> dict:
         'sldy_dir_winsave': 'C:\\Users\\Saul\\OneDrive - UAB - The University of Alabama at Birmingham\\Research\\NVL (Llopis)\\3i\\test_results\\Slide3-testing.sldy',
         'sldy_dir_macsave': '/Users/saulglopez/Library/CloudStorage/OneDrive-UAB-TheUniversityofAlabamaatBirmingham/Research/NVL (Llopis)/3i/test_results/Slide3-testing.sldy',
 
-        #'folder': 'C:\\Users\\saul\\Downloads\\cabmi_expt',
-        'folder': '/Users/saulglopez/Downloads/',
+        'folder': 'C:\\Users\\saul\\Downloads\\cabmi_expt',
+        #'folder': '/Users/saulglopez/Downloads/cabmi_expt',
         'animal': 'ago23',
         'day': 'DF',
         'date': '230423',

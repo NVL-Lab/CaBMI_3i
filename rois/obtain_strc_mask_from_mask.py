@@ -33,7 +33,7 @@ def obtain_strc_mask_from_mask(mask):
         strc_mask['minx'].append(posx[0])
         strc_mask['maxy'].append(posy[-1])
         strc_mask['miny'].append(posy[0])
-        strc_mask['neuronMask'].append(aux_mask[posy[0]:posy[-1]+1, posx[0]:posx[-1]+1])
+        strc_mask['neuron_mask'].append(aux_mask[posy[0]:posy[-1]+1, posx[0]:posx[-1]+1])
 
         strc_mask['xctr'].append(roi_ctr[0, u])
         strc_mask['yctr'].append(roi_ctr[1, u])

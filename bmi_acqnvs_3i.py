@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import numpy as np
 import time
 
+from SBReadFile22.SBReadFile import *
 from save_files_3i import save_files_3i
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
@@ -76,7 +77,7 @@ def init_data(expected_expt_length, number_neurons, vector_stim, debug_bool=Fals
 
     return data
 
-def bmi_acqnvs_3i(sb_file_reader, capture, path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
+def bmi_acqnvs_3i(path_data, expt_str, baseline_calib_file, tset, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal) -> None:
     # Load flag configuration file
     flags = get_flags()[expt_str]
 

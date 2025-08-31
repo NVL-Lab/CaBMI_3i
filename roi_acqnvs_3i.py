@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
 
+from wait_on_reader_3i import wait_for_reader
 from rois.scale_im_interactive import scale_im_interactive
 from segmentation.im_find_cells_tm import im_find_cells_tm
 from rois.get_center import get_center
@@ -9,15 +10,11 @@ from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_c
 from rois.delete_roi_2chan import delete_roi_2chan
 from rois.draw_roi_g_chan import draw_roi_g_chan
 
-from wait_on_reader_3i import wait_for_reader
-
-def roi_acqnvs_3i(sb_file_reader, capture, task_set, path_data, see_roi_data_flag=False, run=False) -> np.array:
-
-
+def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=False) -> np.array:
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
     if not run:
-        try :
-            roi_data = np.load(roi_data_path, allow_pickle=True).items()
+        try:
+            roi_data = np.load(roi_data_path, allow_pickle=True)
             return roi_data
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
@@ -124,5 +121,5 @@ def roi_acqnvs_3i(sb_file_reader, capture, task_set, path_data, see_roi_data_fla
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
 
-    np.savez(roi_data_path, plot_images=plot_images, roi_data=roi_data, allow_pickle=True)
-    return roi_data, im_bg
+    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
+    return np.load(roi_data_path, allow_pickle=True)

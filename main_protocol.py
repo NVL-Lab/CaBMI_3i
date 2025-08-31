@@ -1,7 +1,5 @@
 author_= 'Saul Gurgua Lopez'
 
-import sys
-import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 #import suite2p
@@ -34,7 +32,7 @@ if __name__ == '__main__':
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(exp_info['sldy_dir']),
+        'sldy_path': Path(exp_info['sldy_dir_macsave']),
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
         'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")
@@ -42,19 +40,15 @@ if __name__ == '__main__':
     path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
-    # Initializing slidebook object
-    sb_file_reader = None # This needs to be updated
-
     '''
         ROI Acquisition
     '''
-    roi_data, im_bg = roi_acqnvs_3i(sb_file_reader, 0, task_set, path_data, False, False)
-    # maybe return path to load
+    roi_info = roi_acqnvs_3i(task_set, path_data, 0,False, False)
 
     '''
         Baseline Acquisition
     '''
-    bdata = baseline_acqnvs_3i(sb_file_reader, 4, task_set, path_data, roi_data['roi_mask'], True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_info['roi_data'].item()['roi_mask'], 1, True)
     # maybe return path to load
     exit()
 
@@ -91,7 +85,7 @@ if __name__ == '__main__':
     experiment_length = 30 * 60 * task_set['im']['frame_rate']
 
     # Generate vector_stim and ISI
-    vector_stim, isi = get_random_stim(task_set['im']['frameRate'], experiment_length, task_set['rs']['IHSImean'], task_set['rs']['IHSIrange'], False)
+    vector_stim, isi = get_random_stim(task_set['im']['frame_rate'], experiment_length, task_set['rs']['ihsi_mean'], task_set['rs']['ihsi_range'], False)
 
     # Set the seed for baseline
     seed_base = 0
@@ -129,10 +123,10 @@ if __name__ == '__main__':
 
     # Close all plots and display the background image
     plt.close('all')
-    plt.imshow(im_bg)
+    plt.imshow(roi_info['plot_images'][1]['im']) #im_bg
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_acqnvs_3i(path_data, exp_info['expt'], target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal, sb_file_reader)
+    bmi_acqnvs_3i(path_data, exp_info['expt'], target_info_path, task_set, vector_stim, 0, [], base_val_seed, fb_set['fb_bool'], fb_cal)
 
     # D0:
     # 1) Save the workspace in folder

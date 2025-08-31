@@ -22,7 +22,7 @@ def on_cleanup(bdata_path, base_activity):
         # consider storing everything under an npz
         np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(sb_file_reader, capture, tset, path_data, roi_mask, run=False) -> np.array:
+def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, run=False) -> np.array:
     # Save path
     bdata_path = path_data['save_path'] / f'baseline_online{datetime.now().strftime("%y%m%dT%H%M%S")}.npy'
     if not run:
@@ -43,7 +43,7 @@ def baseline_acqnvs_3i(sb_file_reader, capture, tset, path_data, roi_mask, run=F
     #save_files_3i(path_data['save_path'], '', 'baseline')
 
     dilation_factor = 2
-    expected_length = int(np.ceil(tset['cb']['baseline_len'] * tset['im']['frame_rate'] * dilation_factor))
+    expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
 
     # Initialize baseline variables
     number_neurons = int(np.max(roi_mask))
@@ -68,7 +68,7 @@ def baseline_acqnvs_3i(sb_file_reader, capture, tset, path_data, roi_mask, run=F
             for time_point in range(init_time_point, time_point_count):
                 print(f'*** Time Point: {time_point + 1}')
                 start = time.perf_counter()
-                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, tset['im']['chan_data']['chan_idx'], True)
+                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, task_set['im']['chan_data']['chan_idx'], True)
 
                 # Store ROI data
                 unit_vals = get_roi(image, strc_mask)
@@ -76,7 +76,7 @@ def baseline_acqnvs_3i(sb_file_reader, capture, tset, path_data, roi_mask, run=F
                 frame += 1
 
                 end = time.perf_counter() - start
-                delay = max(0, (1 / (tset['im']['frameRate'] * 1.2)) - end)
+                delay = max(0, (1 / (task_set['im']['frameRate'] * 1.2)) - end)
                 time.sleep(delay) # done in order to synchronize frame acquisition
 
             # Check for new timepoints

@@ -32,33 +32,35 @@ from check_motor_behavior import check_motor_behavior
 if __name__ == '__main__':
     # Acquire experiment settings
     fb_set = get_fb_settings()
-    #task_set = get_bmi_settings(38.6)
-    task_set = get_bmi_settings()
+    task_set = get_bmi_settings(38.6)
     exp_info = get_exp_info()
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(exp_info['sldy_dir_macsave']),
+        'sldy_path': Path(f"{exp_info['sldy_dir']}/{exp_info['sldy_name']}"), # Make sure of existence before starting (w/ slidebook)
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
-        'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}"),
-        'test_data': np.load(exp_info['test_data'])
+        'save_path': Path(f"{exp_info['folder']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}")#,
+        #'test_data': np.load(exp_info['test_data'])
     }
     path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
     '''
         ROI Acquisition
+            Capture the image and input the capture index
     '''
-    roi_info = roi_acqnvs_3i(task_set, path_data, 0,True, True)
+    #roi_info = roi_acqnvs_3i(task_set, path_data, 1,True, True)
 
     '''
         Baseline Acquisition
     '''
-    roi_data = roi_info['roi_data'].item()
+    #roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 0, True, False)
+    bdata = baseline_acqnvs_3i(task_set, path_data, [], 17,False, True)
+    #bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 1, True, True)
+    exit()
 
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found
@@ -81,7 +83,7 @@ if __name__ == '__main__':
     if np.any(sec_per_reward_range <= 80):
         raise ValueError("sec_per_reward_range must be higher than 80 seconds to keep the occurrence of artificial vs natural higher than 80%")
 
-    target_info, target_cal_all, fb_cal = baseline2target(bdata, roi_data, e1_base, e2_base, frames_per_reward_range, task_set, path_data['save_path'], fb_set, False)
+    target_info, target_cal_all, fb_cal = baseline2target(bdata, roi_data, e1_base, e2_base, frames_per_reward_range, task_set, path_data['save_path'], fb_set, True)
 
     vector_stim, isi = get_random_stim(task_set['im']['frame_rate'], task_set['bmi_len'] * task_set['im']['frame_rate'], task_set['rs']['ihsi_mean'], task_set['rs']['ihsi_range'], False)
 
@@ -101,8 +103,8 @@ if __name__ == '__main__':
     plt.show()
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_data = bmi_acqnvs_3i(task_set, path_data, 0, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
+    bmi_data = bmi_acqnvs_3i(task_set, path_data, 2, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
                              0, [], np.ones(len(e1_base) + len(e2_base)) * np.nan, fb_set['fb_bool'], fb_cal, False, True)
 
     # If motor behavior experiment, run this
-    check_motor_behavior(task_set, path_data, 0, exp_info['expt'], False, False)
+    check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

@@ -5,9 +5,9 @@ from wait_on_reader_3i import wait_for_reader
 from rois.scale_im_interactive import scale_im_interactive
 #from segmentation.im_find_cells_tm import im_find_cells_tm
 from segmentation.im_find_cells_suite2p import im_find_cells_suite2p
-from rois.get_center import get_center
+#from rois.get_center import get_center
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
-from rois.delete_roi_2chan import delete_roi_2chan
+#from rois.delete_roi_2chan import delete_roi_2chan
 from rois.edit_roi_mask_suite2p import edit_roi_mask
 
 def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=False) -> np.array:
@@ -24,12 +24,13 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     sb_file_reader = wait_for_reader(path_data['sldy_path'])
     while sb_file_reader.GetNumCaptures() < capture + 1:
         capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
-        sb_file_reader.Refresh(capture)
+        sb_file_reader = wait_for_reader(path_data['sldy_path'])
+        #sb_file_reader.Refresh(capture)
 
     # Single image is used to locate ROIs
     # first = roi detect capture, second=baseline recording, third=bmi recording, fourth=behavior recording
     im_summary = sb_file_reader.ReadImagePlaneBuf(capture,0,0,0,task_set['im']['chan_data']['chan_idx'],True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel (0=RFP, 1=GFP), True for 2d array return
-    im_summary = path_data['test_data'][99]
+    #im_summary = path_data['test_data'][99]
 
     # Scale image to see ROIs better
     print('\nImage Scaling')
@@ -70,7 +71,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     # Add ROI if needed
     # print('Adding ROIs to image!')
     print('Editing ROI mask!')
-    roi_mask = edit_roi_mask(roi_mask, path_data['save_path'])
+    roi_mask = edit_roi_mask(roi_mask, path_data['save_path'], sb_file_reader.GetNumYRows(capture), sb_file_reader.GetNumXColumns(capture))
     # roi_data = draw_roi_g_chan(plot_images, roi_data)
     plt.close('all')
 
@@ -78,13 +79,13 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     # Figure out how to delete
     roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, task_set['im']['chan_data'])
 
-    '''
+    #'''
     # Delete ROI if needed
     print('Deleting ROIs from image!')
     print('----------------------------------------')
     roi_data = delete_roi_2chan(plot_images, roi_data)
     plt.close('all')
-    '''
+    #'''
 
     # Visualize
     plt.figure()
@@ -110,5 +111,5 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
 
-    #np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
+    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
     return np.load(roi_data_path, allow_pickle=True)

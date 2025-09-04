@@ -14,9 +14,9 @@ def get_bmi_settings(fr = 29.752) -> dict:
             'frame_rate': fr,     # Copy from PrairieValue (might change with 3i)
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
-            'chan_data': {        # RGB; G is 1st and R is 2nd
+            'chan_data': {
                 'label': 'g',
-                'chan_idx': 0 #2
+                'chan_idx': 1     # RGB; G is 1st and R is 2nd (seems to be the opposite on windows...)
             }                 
         },
 

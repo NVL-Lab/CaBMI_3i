@@ -4,7 +4,7 @@ import suite2p
 from suite2p.run_s2p import pipeline as suite2p_pipeline
 import subprocess
 
-def edit_roi_mask(image, save_path):
+def edit_roi_mask(image, save_path, ly, lx):
     roi_mask = np.zeros((image.shape[1], image.shape[0]), dtype=np.float64)
     image = np.array([image])
 
@@ -18,8 +18,8 @@ def edit_roi_mask(image, save_path):
     ops['reg_file'] = suite2p_path
     ops['save_path'] = suite2p_path
     ops['ops_path'] = suite2p_path / 'ops.npy'
-    ops['Ly'] = 512
-    ops['Lx'] = 512
+    ops['Ly'] = ly
+    ops['Lx'] = lx
 
     im_path = suite2p_path / 'im_bg.npy'
     np.save(im_path, image)

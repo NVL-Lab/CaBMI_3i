@@ -19,6 +19,8 @@ def on_cleanup(save_path, data, bdata):
         print('Cleaning...')
         np.savez(save_path, data=data, bdata=bdata)
 
+# TODO: base_val_seed can be :Optional[np.array]=None double check what goes between the brackets, not sure if np.array or ndarray or something of the sort.
+# Basevalseed are values to add to "initialize the baseline" instead of starting with ones or nans.
 def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_bool, debug_input, base_val_seed, fb_bool, fb_cal, plot=False, run=False) -> np.ndarray:
     bname = 'bmi_online'
     if not run:
@@ -36,12 +38,14 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
     sb_file_reader = wait_for_reader(path_data['sldy_path'])
     while sb_file_reader.GetNumCaptures() < capture + 1:
         capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
-        sb_file_reader.Refresh(capture)
+        sb_file_reader = wait_for_reader(path_data['sldy_path'])
+        #sb_file_reader.Refresh(capture)
 
     # Load flag configuration file
     flags = get_flags()[expt_str]
 
     # BMI parameters
+    # TODO: send all hardcoded parameters to tset
     relaxation_time = 1 #0 # there can't be another hit in this many sec
 
     # Values of parameters in frames
@@ -100,8 +104,12 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
         })
 
     trial_flag = True #1
-    non_buffer_update_counter = 0 #tset['prefix_win']  # Counter when we don't want to update the buffer
-    init_frame_base = 0 # non_buffer_update_counter + 1
+    # TODO: decide the non_buffer_upodate_counter is worth keeping or not. Don't keep it at 0
+    # Nuria explanation: this buffer was to "drop" the first images to avoid artifacts
+    #: TODO: Nuria changed the following to remove the 0 back to the tset value
+    non_buffer_update_counter = tset['prefix_win']  # Counter when we don't want to update the buffer
+    # TODO: Nuria changed this back from the 0 back to the value of the non-buffer-update
+    init_frame_base = non_buffer_update_counter + 1
     # Beginning of experiment and VTA stim
     buffer_update_counter = 0
 
@@ -113,7 +121,10 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
 
     data['frame'] = 0 #1
     base_buffer_full = False
+    # TODO: send all hardcoded parameters to tset
     max_wait = 5  # seconds
+
+    # TODO: get water delivery setup
 
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bmi_data_path, data, bdata):
@@ -130,15 +141,16 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
         a.write_digital("D9", 0)
         '''
 
-        #init_time_point = 0
-        init_time_point = 8925
+        init_time_point = 0
+        #init_time_point = 8925
         sleep_time = 0.001  # 10 ms (consider no sleep)
         #capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide
-        #time_point_count = sb_file_reader.GetNumTimepoints(capture)
-        time_point_count = 26778 # 18077 actual frames difference
+        time_point_count = sb_file_reader.GetNumTimepoints(capture)
+        #time_point_count = 26778 # 18077 actual frames difference
         plane_count = sb_file_reader.GetNumZPlanes(capture)
         z_plane = int(plane_count/2)
 
+        # TODO: change this to the current time when the record starts and the buffer fills
         print('STARTING RECORDING!!!')
         print('baseBuffer filling!...')
         read_break = False
@@ -147,7 +159,9 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
             fig = plt.figure(0)
             title = 'Timepoint: {tp:6d}'
 
-        for the_retry in range(0, 500):  # Will run for 500 frames (0, 500)
+        for the_retry in range(0, expected_expt_length):  # Will run for expected_expt_length frames (0, expected_expt_length)
+            # TODO: you want to be current on time, regardless of how many frames you "may" lose. But you want to know that you lost frames.
+            # TODO: the reason is to avoid lags that can accumulate to the point that the animal is getting feedback that is seconds late.
             for time_point in range(init_time_point, time_point_count):
                 if debug_bool and data['frame'] > debug_input.shape[1]: # debug_input.shape[1] or maybe len if 1D list
                     break
@@ -155,26 +169,28 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                 print(f'*** Time Point: {time_point + 1}')
 
                 if not debug_bool:
+                    # TODO: you want the time point to be the last timepoint
                     image = sb_file_reader.ReadImagePlaneBuf(capture, 0, time_point, z_plane, tset['im']['chan_data']['chan_idx'], True)
-                    image = path_data['test_data'][time_point]
+                    # image = path_data['test_data'][time_point]
                     if image.shape[0] == 0:
                         break
 
                 start_time = time.perf_counter()
 
-                if not debug_bool and plot:
-                    if time_point == 0:
-                        img_artist = plt.imshow(image)
-                    elif time_point % 2 == 0:
-                        img_artist.set_data(image)
-                        plt.draw()
-                        fig.canvas.flush_events()
-                        plt.title(title.format(tp=time_point), loc='left')
-                        try:
-                            plt.pause(0.01)
-                        except KeyboardInterrupt:
-                            print("Keyboard Interrupt")
-                            exit()
+                # TODO: nuria removed it because you don't want to waste time ploting
+                # if not debug_bool and plot:
+                #     if time_point == 0:
+                #         img_artist = plt.imshow(image)
+                #     elif time_point % 2 == 0:
+                #         img_artist.set_data(image)
+                #         plt.draw()
+                #         fig.canvas.flush_events()
+                #         plt.title(title.format(tp=time_point), loc='left')
+                #         try:
+                #             plt.pause(0.01)
+                #         except KeyboardInterrupt:
+                #             print("Keyboard Interrupt")
+                #             exit()
 
                 if non_buffer_update_counter == 0:
                     print('Extracting ROI Mask...')
@@ -182,6 +198,8 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                         unit_vals = get_roi(image, strc_mask)  # Function to obtain Rois values
                     else:
                         unit_vals = debug_input[:, data['frame']]
+                    # TODO: be careful that "frame" is the same as timepoint for you, since you are retrieving the data
+                    # TODO: directly from the saved microscope data.
                     data['bmi_act'][:, data['frame']] = unit_vals
 
                     fbuffer[:, :-1] = fbuffer[:, 1:]
@@ -189,6 +207,7 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
 
                     print('Calculating Baseline Buffer...')
                     if data['frame'] == init_frame_base:
+                        # TODO: if basevalseed is not None once you change the input as optional None
                         if not np.isnan(np.sum(base_val_seed)):
                             base_buffer_full = True
                             base_val = base_val_seed
@@ -334,6 +353,6 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
             # Loop again
             init_time_point = time_point_count
             time_point_count = sb_file_reader.GetNumTimepoints(capture)
-            break
+            #break
 
     return np.load(bmi_data_path, allow_pickle=True)

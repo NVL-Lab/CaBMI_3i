@@ -144,13 +144,15 @@ def main(argv):
                 #    continue
                 #print ("*** The read buffer len is: " , len(image))
                 #calculate mean intensity using numpy
-
+                print(time.perf_counter()-st1)
+                '''
                 theMean = np.mean(image)
                 print ("*** theTimepoint: " , theTimepoint+1, "The mean: ",theMean)
                 if theMean==0:
                     #streaming has missed a timepoint
                     #insert a break here
                     print ("****** Mean is 0 ****** ")
+                '''
                 '''
                 #plot the slice every n timepoints
 

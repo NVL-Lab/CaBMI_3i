@@ -13,7 +13,7 @@ def wait_for_reader(file_path, wait_seconds=500):
         else:
             if attempt == 0:
                 print(
-                    f"Input file does not exist. Retrying for up to {wait_seconds} seconds\n"
+                    f"{file_path} does not exist. Retrying for up to {wait_seconds} seconds\n"
                     "Press Ctrl+C to exit."
                 )
         time.sleep(1)

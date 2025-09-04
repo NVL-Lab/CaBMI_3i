@@ -15,7 +15,7 @@ def get_fb_settings(tlf=True, fmin=6000, fmax=19000) -> dict:
         tfe1s = 15000
 
     return {
-        'fb_bool': 1,           # True: feedback, 0: silence
+        'fb_bool': True,           # True: feedback, 0: silence
         'target_low_freq': tlf,
         
         #Set the target cursor value to be the low frequency

@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.ndimage import label
 
 from wait_on_reader_3i import wait_for_reader
 from rois.scale_im_interactive import scale_im_interactive
-from segmentation.im_find_cells_tm import im_find_cells_tm
+#from segmentation.im_find_cells_tm import im_find_cells_tm
+from segmentation.im_find_cells_suite2p import im_find_cells_suite2p
 from rois.get_center import get_center
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.delete_roi_2chan import delete_roi_2chan
-from rois.draw_roi_g_chan import draw_roi_g_chan
+from rois.edit_roi_mask_suite2p import edit_roi_mask
 
 def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=False) -> np.array:
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
@@ -22,20 +22,16 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
             exit(1)
 
     sb_file_reader = wait_for_reader(path_data['sldy_path'])
-    while sb_file_reader.GetNumCaptures() < capture+1:
+    while sb_file_reader.GetNumCaptures() < capture + 1:
         capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
-        sb_file_reader = wait_for_reader(path_data['sldy_path'])
+        sb_file_reader.Refresh(capture)
 
     # Single image is used to locate ROIs
     # first = roi detect capture, second=baseline recording, third=bmi recording, fourth=behavior recording
     im_summary = sb_file_reader.ReadImagePlaneBuf(capture,0,0,0,task_set['im']['chan_data']['chan_idx'],True) # capture (0-n), position (~montage = 0), timepoint, zplane num, channel (0=RFP, 1=GFP), True for 2d array return
+    im_summary = path_data['test_data'][99]
 
     # Scale image to see ROIs better
-    '''
-        Why save them all?
-        num_im_sc will not be used
-        only necessary parameter is im_summary
-    '''
     print('\nImage Scaling')
     print('----------------------------------------')
     im_sc_struct, _ = scale_im_interactive(im_summary, [],0)
@@ -59,30 +55,35 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     # A T = 0.3 or 0.4 (OR 3 or 4) (we want 0.5 to 1) might be noise so we wouldn't want that
     # Want a Gaussian distribution of T, if not a bit flatter overall
     # Calibration may be wrong if no hits happen in the first 5 min
-    print('Cell Identification')
+
+    print('Detecting Cells')
     print('----------------------------------------')
+    '''
     mask_intermediate, _ = im_find_cells_tm(im_bg, task_set['roi']['template_diam'],task_set['roi']['thres'], task_set['roi']['cell_diam'], task_set['roi']['finemode'], task_set['roi']['temmode'] )
     init_roi_mask = label(mask_intermediate)
     x_center, y_center = get_center(init_roi_mask[0], im_bg, True)
     roi_data = label_mask2roi_data_single_channel(im_bg, init_roi_mask[0], task_set['im']['chan_data'])
+    '''
+    roi_mask = im_find_cells_suite2p(im_bg)
+    #x_center, y_center = get_center(roi_mask, im_bg, True)
+
+    # Add ROI if needed
+    # print('Adding ROIs to image!')
+    print('Editing ROI mask!')
+    roi_mask = edit_roi_mask(roi_mask, path_data['save_path'])
+    # roi_data = draw_roi_g_chan(plot_images, roi_data)
+    plt.close('all')
+
+    # Need to make sure that the F is greater than 0 for added ROIs
+    # Figure out how to delete
+    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, task_set['im']['chan_data'])
 
     '''
-    print('Detecting Cells')
-    ops, stat = suite2p.detection_wrapper(f_reg=im_bg, ops=suite2p.default_ops(), classfile=suite2p.classification.builtin_classfile) # im_bg must be npy file
-    iscell = suite2p.detection.classify(stat, suite2p.classification.builtin_classfile )
-    roi_mask = np.zeros((ops['Ly'], ops['Lx']), dtype=np.uint32)
-    cell_count = 0
-    for i, roi in enumerate(stat):
-        if iscell[i]:
-            cell_count += 1
-            roi_mask[roi['ypix'], roi['xpix']] = cell_count * roi['lam']
-    print(f"{cell_count} cells detected.")
-    plt.figure()
-    plt.imshow(roi_mask, cmap='nipy_spectral')
-    plt.title("ROI Neurons")
-    plt.colorbar(label="Label index")
-    plt.show()
-    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask[0], task_set['im']['chan_data'])
+    # Delete ROI if needed
+    print('Deleting ROIs from image!')
+    print('----------------------------------------')
+    roi_data = delete_roi_2chan(plot_images, roi_data)
+    plt.close('all')
     '''
 
     # Visualize
@@ -97,19 +98,6 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
     plt.show()
     print('----------------------------------------')
 
-    # Delete ROI if needed
-    print('Deleting ROIs from image!')
-    print('----------------------------------------')
-    roi_data = delete_roi_2chan(plot_images, roi_data)
-    plt.close('all')
-
-    # Add ROI if needed
-    '''
-    print('Adding ROIs to image!')
-    roi_data = draw_roi_g_chan(plot_images, roi_data)
-    plt.close('all')
-    '''
-
     # See ROI if needed
     if see_roi_data_flag:
         plt.figure()
@@ -122,5 +110,5 @@ def roi_acqnvs_3i(task_set, path_data, capture, see_roi_data_flag=False, run=Fal
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
 
-    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
+    #np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
     return np.load(roi_data_path, allow_pickle=True)

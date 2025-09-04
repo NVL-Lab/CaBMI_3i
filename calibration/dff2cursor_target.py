@@ -20,7 +20,7 @@ def dff2cursor_target(dff, bdata, cursor_zscore_bool):
     Returns:
     tuple: (dff_z, cursor, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool)
     """
-    num_e2 = len(bdata['E2_sel_idxs'].flatten())
+    num_e2 = len(bdata['e2_sel_idxs'].flatten())
 
     # Ensure dff is a row vector
     dff = np.array(dff).flatten()
@@ -35,8 +35,8 @@ def dff2cursor_target(dff, bdata, cursor_zscore_bool):
         n_analyze = dff
 
     # Select E1 and E2 ensembles
-    e1 = n_analyze[bdata['E1_sel_idxs'].flatten()-1]
-    e2 = n_analyze[bdata['E2_sel_idxs'].flatten()-1]
+    e1 = n_analyze[bdata['e1_sel_idxs'].flatten()-1]
+    e2 = n_analyze[bdata['e2_sel_idxs'].flatten()-1]
 
     # c1: cursor
     cursor = np.dot(n_analyze, bdata['decoder'])
@@ -54,9 +54,9 @@ def dff2cursor_target(dff, bdata, cursor_zscore_bool):
     c3_val = e2_subord_mean
 
     # Boolean checks
-    c1_bool = cursor >= bdata['T1']
-    c2_bool = e1_mean <= bdata['E1_thresh']
-    c3_bool = e2_subord_mean >= bdata['E2_subord_thresh'][e2_dom_sel]
+    c1_bool = cursor >= bdata['t1']
+    c2_bool = e1_mean <= bdata['e1_thresh']
+    c3_bool = e2_subord_mean >= bdata['e2_subord_thresh'][e2_dom_sel]
 
     # Determine if the target is hit
     target_hit = c1_bool

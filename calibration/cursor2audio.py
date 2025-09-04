@@ -1,6 +1,6 @@
 import numpy as np
 
-def cursor2audio(cursor, fb_cal) -> float:
+def cursor2audio(cursor, fb_cal, fb_cal_settings) -> float:
     """
     Converts the neural control signal (cursor) to an auditory feedback frequency.
 
@@ -18,7 +18,8 @@ def cursor2audio(cursor, fb_cal) -> float:
     """
 
     # Handle target to frequency conversion
-    if fb_cal['settings']['target_low_freq'] == 1:
+    # PRONE TO CHANGE!!
+    if fb_cal_settings['target_low_freq'] == 1:
         # If cursor up makes frequency go down
         cursor = -cursor
         cursor_min = -fb_cal['cursor_max']
@@ -29,11 +30,11 @@ def cursor2audio(cursor, fb_cal) -> float:
         cursor_max = fb_cal['cursor_max']
 
     # Truncate cursor within the defined range
-    cursor_trunc = max(cursor, cursor_min)
-    cursor_trunc = min(cursor_trunc, cursor_max)
+    cursor_trunc = np.maximum(cursor, cursor_min)
+    cursor_trunc = np.minimum(cursor_trunc, cursor_max)
 
     # Calculate the frequency using the exponential formula
     freq = fb_cal['a'] * np.exp(fb_cal['b'] * (cursor_trunc - cursor_min))
-    
-    return float(freq)
+
+    return freq.astype(np.float64)
 

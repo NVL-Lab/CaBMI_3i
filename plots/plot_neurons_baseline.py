@@ -13,8 +13,12 @@ def plot_neurons_baseline(base_activity, c_comp, yr_a, total_neurons=20):
     - total_neurons: Amount of neurons to be displayed (integer)
     """
     # Calculate standard deviation and mean
+    # Why skip the first 10 frames?
     sm = np.nanstd(base_activity[:, 10:], axis=1) / np.nanmean(base_activity[:, 10:], axis=1)
     s = np.nanstd(base_activity[:, 10:], axis=1)
+    # custom
+    #sm = np.nanstd(base_activity[:, :10], axis=1) / np.nanmean(base_activity[:, :10], axis=1)
+    #s = np.nanstd(base_activity[:, :10], axis=1)
 
     # Sort neurons based on sm and s
     indm = np.argsort(sm)[::-1]

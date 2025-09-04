@@ -1,3 +1,6 @@
+import numpy as np
+from .find_center import find_center
+
 def get_mask(mask) -> dict:
     """
     Function to create a structure with a reduced image given a spatial filter.
@@ -26,7 +29,7 @@ def get_mask(mask) -> dict:
         'minx': np.zeros(num_roi, dtype=int),
         'maxy': np.zeros(num_roi, dtype=int),
         'miny': np.zeros(num_roi, dtype=int),
-        'neuronMask': [None] * num_roi,
+        'neuron_mask': [None] * num_roi,
         'xctr': np.zeros(num_roi),
         'yctr': np.zeros(num_roi),
         'width': np.zeros(num_roi),
@@ -42,7 +45,7 @@ def get_mask(mask) -> dict:
         strc_mask['minx'][u] = posx[0]
         strc_mask['maxy'][u] = posy[-1]
         strc_mask['miny'][u] = posy[0]
-        strc_mask['neuronMask'][u] = aux_mask[posy[0]:posy[-1]+1, posx[0]:posx[-1]+1]
+        strc_mask['neuron_mask'][u] = aux_mask[posy[0]:posy[-1]+1, posx[0]:posx[-1]+1]
 
         # Auxiliary Information:
         strc_mask['xctr'][u] = roi_ctr[0, u]

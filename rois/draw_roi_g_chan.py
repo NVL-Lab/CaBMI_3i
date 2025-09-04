@@ -35,7 +35,7 @@ def draw_roi_g_chan(plot_images, roi_data):
         h0 = plt.figure()
         plt.imshow(roi_data['im_roi'], cmap='bone')
         plt.clim([-0, np.nanmedian(roi_data['im_roi']) * 20])
-        plt.axis('square')
+        #plt.axis('square')
         plt.title(f"Num ROIs added: {roi_data['num_rois']}  Add ROI? y/n")
         in_str = input('Want to Add ROI? y/n:   ').strip().lower()
 

@@ -1,39 +1,39 @@
 def get_flags() -> dict:
     return {
-        'BMI_stim': {
-            'flagBMI': True,
-            'flagDRstim': True,
-            'flagStimRandom': False,
-            'flagWater': False
+        'bmi_stim': {
+            'bmi_stim': True,
+            'dr_stim': True,
+            'stim_random': False,
+            'water': False
         },
-        'RandomDRstim': {
-            'flagBMI': True,
-            'flagDRstim': False,
-            'flagStimRandom': True,
-            'flagWater': False
+        'Random_dr_stim': {
+            'bmi_stim': True,
+            'dr_stim': False,
+            'stim_random': True,
+            'water': False
         },
         'no_stim': {
-            'flagBMI': True,
-            'flagDRstim': False,
-            'flagStimRandom': False,
-            'flagWater': False
+            'bmi_stim': True,
+            'dr_stim': False,
+            'stim_random': False,
+            'water': False
         },
-        'BMI_no_stim_water': {
-            'flagBMI': True,
-            'flagDRstim': False,
-            'flagStimRandom': False,
-            'flagWater': True
+        'bmi_no_stim_water': {
+            'bmi_stim': True,
+            'dr_stim': False,
+            'stim_random': False,
+            'water': True
         },
-        'BMI_stim_water': {
-            'flagBMI': True,
-            'flagDRstim': True,
-            'flagStimRandom': False,
-            'flagWater': True
+        'bmi_stim_water': {
+            'bmi_stim': True,
+            'dr_stim': True,
+            'stim_random': False,
+            'water': True
         },
-        'BMI_random_stim_water': {
-            'flagBMI': True,
-            'flagDRstim': False,
-            'flagStimRandom': True,
-            'flagWater': True
+        'bmi_random_stim_water': {
+            'bmi_stim': True,
+            'dr_stim': False,
+            'stim_random': True,
+            'water': True
         }
 }

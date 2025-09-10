@@ -73,8 +73,9 @@ def edit_roi_mask(image, save_path):
 
         np.save(suite2p_path / 'stat_orig.npy', stat)
         '''
+
         # Runs suite2p pipeline
-        suite2p.run_s2p.pipeline(image, run_registration=False, ops=ops, stat=stat)
+        suite2p.pipeline(image, run_registration=False, ops=ops, stat=stat)
 
         # Saves original iscell file in place of pipeline one, which is wrong
         # TODO: fix pipeline iscell

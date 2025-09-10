@@ -50,7 +50,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     #number_neurons = int(np.max(roi_mask))
     #strc_mask = obtain_strc_mask_from_mask(roi_mask)
     #base_activity = np.full((number_neurons, expected_length), np.nan)
-    base_activity = np.full((39, expected_length), np.nan)
+    base_activity = np.full((200, 390, 403), np.nan)
 
     frame = 0
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
@@ -77,6 +77,8 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
 
     frames_captured = 0
     temp_time_point = 0
+    frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
+
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bdata_path, base_activity):
         while counter_same < 1000:
@@ -85,7 +87,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
 
             print(f'*** Time Point: {curr_time_point}')
-            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point, z_plane, task_set['im']['chan_data']['gpmt_idx'], True)  # recording is different index
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point-1, z_plane, task_set['im']['chan_data']['green']['pmt_idx'], True)  # recording is different index
 
             #if not np.array_equal(image, last_image):
             if curr_time_point != temp_time_point:
@@ -93,18 +95,18 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                 frames_captured += 1
                 print(f'*** Frames captured: {frames_captured}')
                 start_time = time.perf_counter()
-                last_image = image  # comparison and assignment
+                #last_image = image  # comparison and assignment
 
                 # Store ROI data
                 # unit_vals = get_roi(image, strc_mask)
                 # base_activity[:, frame] = unit_vals
+                base_activity[frame] = image
                 frame += 1
                 counter_same = 0
 
                 elapsed_time = time.perf_counter() - start_time
                 print(f'Execution time: {elapsed_time} seconds')
 
-                frame_interval = 1 / (task_set['im']['frame_rate'])# * 1.2)
                 if elapsed_time < frame_interval:
                     time.sleep(frame_interval - elapsed_time)
             else:

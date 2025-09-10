@@ -2,7 +2,7 @@ from pathlib import Path
 import math 
 
 def get_bmi_settings(fr = 38.6) -> dict:
-    # Prairie: 29.752
+    #fr = 29.752 # Prairie
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
         'bmi_env': Path('utils/Tseries_BMI_30.env'),
@@ -38,7 +38,7 @@ def get_bmi_settings(fr = 38.6) -> dict:
         # Calibration
         'cb': {
             'sec_per_reward_range': [70, 50], # [100 70]; [120 90] a range on how many frames (per sec) should elapse before a reward is expected.  Used to calibrate the target patterns.
-            'baseline_len': 5*60,          # Seconds (15*60)
+            'baseline_len': 20,          # Seconds (15*60)
             'f0_win_bool': True,      # During cb, if true, estimate f0 with a window of activity.  if false, estimate f0 using the full baseline,
             'dff_win_bool': True,
             'f0_init_slide': False,   # During cb, if 0, f0 is only used after f0_win samples. If 1, f0 is adapted in the window from 0 to f0_win samples.

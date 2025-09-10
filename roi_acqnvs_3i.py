@@ -25,7 +25,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     # Single image is used to locate ROIs
     # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
     im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, chan_data['fp_idx'], True)
-    im_raw = path_data['test_data'][99]
+    #im_raw = path_data['test_data'][99]
 
     # Scale image to see ROIs better
     print('\nImage Scaling')

@@ -6,7 +6,7 @@ from .roi_bin_cell2center_radius import roi_bin_cell2center_radius
 def label_mask2roi_data_single_channel(im_bg, label_mask, chan_data):
     roi_data = {}
 
-    num_chan = len(chan_data)
+    num_chan = 1 #len(chan_data)
     num_rows, num_cols = im_bg.shape[:2]
 
     roi_data['num_chan'] = num_chan
@@ -45,8 +45,8 @@ def label_mask2roi_data_single_channel(im_bg, label_mask, chan_data):
     # Assign channel info
     roi_data['chan'] = [{} for _ in range(num_chan)]
     for i, chan in enumerate(chan_data):
-        chan_idx = chan_data['chan_idx']-1
-        roi_data['chan'][chan_idx]['label'] = chan_data['label']
+        chan_idx = chan_data['gfp_idx']-1
+        roi_data['chan'][chan_idx]['label'] = 'g' #chan_data['label']
         roi_data['chan'][chan_idx]['num_rois'] = roi_data['num_rois']
         roi_data['chan'][chan_idx]['idxs'] = list(range(1, roi_data['num_rois'] + 1))
         roi_data['chan'][chan_idx]['im_roi'] = roi_data['im_roi']

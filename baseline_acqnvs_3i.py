@@ -85,7 +85,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
 
             print(f'*** Time Point: {curr_time_point}')
-            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point, z_plane, 0, True)  # recording is different index
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point, z_plane, task_set['im']['chan_data']['gpmt_idx'], True)  # recording is different index
 
             #if not np.array_equal(image, last_image):
             if curr_time_point != temp_time_point:

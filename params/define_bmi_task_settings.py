@@ -1,30 +1,30 @@
 from pathlib import Path
 import math 
 
-def get_bmi_settings(fr = 29.752) -> dict:
+def get_bmi_settings(fr = 38.6) -> dict:
     # Prairie: 29.752
     return {
-        #'baseline_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_baseline_15.env'),
-        #'bmi_env': Path('~/Scripts/uab/nvl_lab/CaBMI-3i/utils/Tseries_BMI_30.env'),
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
         'bmi_env': Path('utils/Tseries_BMI_30.env'),
 
         # Imaging
         'im': {
-            'frame_rate': fr,     # Copy from PrairieValue (might change with 3i)
+            'frame_rate': fr,
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
             'chan_data': {
-                'label': 'g',
-                'chan_idx': 1     # RGB; G is 1st and R is 2nd (seems to be the opposite on windows...)
-            }                 
+                'gfp_idx': 1,
+                'gpmt_idx': 0,
+                'rfp_idx': 0,
+                'rpmt_idx': 1,
+            }
         },
 
         # Regions of Interest (ROIs)
         'roi': {
             'template_diam': 3,  # Diameter of difference of Gaussians in pixels
-            'thres': 0.5,         # Cell detection threshold as correlation coefficient
-            'cell_diam': 17,       # CELL_DIAM is diameter used for dilation.
+            'thres': 0.5,        # Cell detection threshold as correlation coefficient
+            'cell_diam': 17,     # CELL_DIAM is diameter used for dilation.
             'finemode': 1,       # imTemplateMatch will be used instead of normxcorr2. It will be slower.
             'temmode': True      # false is for full circle (soma); true is for donuts (membrane)
         },

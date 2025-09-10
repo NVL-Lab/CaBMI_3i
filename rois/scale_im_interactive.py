@@ -42,6 +42,7 @@ def scale_im_interactive(im, im_sc_struct, num_im_sc):
         plt.imshow(im_sc, cmap='bone', vmin=0, vmax=1)
         plt.title(f'min prc: {min_perc}; max prc: {max_perc}')
         plt.show()
+        plt.close()
 
         already_added = False
         in_store = input('Want to Store this Scaling? y/n:   ').strip().lower()

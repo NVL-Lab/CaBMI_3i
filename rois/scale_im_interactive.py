@@ -4,20 +4,6 @@ import numpy as np
 from .scale_im import scale_im
 
 def scale_im_interactive(im, im_sc_struct, num_im_sc):
-    # Get screen size using tkinter - is this needed?
-    '''
-    root = tk.Tk()
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    root.destroy()
-
-    # Define figure size and position (right half of the screen)
-    fig_width = int(screen_width / 2)
-    fig_height = screen_height
-    x_pos = int(screen_width / 2)
-    y_pos = 0
-    '''
-
     scale_complete_bool = False
     param_vec = [0, 100]
     while not scale_complete_bool:
@@ -33,11 +19,6 @@ def scale_im_interactive(im, im_sc_struct, num_im_sc):
         min_perc, max_perc = param_vec
         im_sc, im_min, im_max = scale_im(im, min_perc, max_perc)
 
-        '''
-        fig = plt.figure(figsize=(fig_width / 100, fig_height / 100))  # size in inches
-        manager = plt.get_current_fig_manager()
-        manager.window.wm_geometry(f"{fig_width}x{fig_height}+{x_pos}+{y_pos}")
-        '''
         plt.figure()
         plt.imshow(im_sc, cmap='bone', vmin=0, vmax=1)
         plt.title(f'min prc: {min_perc}; max prc: {max_perc}')

@@ -13,15 +13,16 @@ def create_roi_mask(image, stat, iscell):
             roi_mask[roi['ypix'], roi['xpix']] += cell_count  # * roi['lam'] # Intensities
 
     plt.figure()
-    plt.imshow(roi_mask, cmap='nipy_spectral')
+    plt.imshow(image[0], cmap='bone')
+    plt.imshow(roi_mask, cmap='nipy_spectral', alpha=0.7)
     plt.title(f'ROI Mask: {cell_count} Neurons')
-    plt.colorbar(label="Label index")
+    plt.colorbar(label="ROI Label Index")
     plt.show()
     plt.close()
 
     return roi_mask
 
-def edit_roi_mask(image, save_path):
+def get_roi_mask(image, save_path):
     image = np.array([image]) # suite2p expects several frames (Lx, Ly, Lz)
 
     ops = suite2p.default_ops()
@@ -34,7 +35,7 @@ def edit_roi_mask(image, save_path):
 
     roi_mask = create_roi_mask(image, stat, iscell)
 
-    edit_resp = input('Would you like to edit the amount of ROIs shown? (y/n)  ').strip().lower()
+    edit_resp = input('Would you like to edit the amount of ROIs shown? (y/n)   ').strip().lower()
     if edit_resp == 'y' or edit_resp == '':
         # Needed for suite2p GUI
         suite2p_path = save_path / 'suite2p_roi_detection'
@@ -48,10 +49,16 @@ def edit_roi_mask(image, save_path):
         ops['Ly'] = image.shape[1]
         ops['Lx'] = image.shape[2]
 
-        '''
         # Runs additional steps of pipeline
-        # The following is from suite2p.run_s2p.pipeline(image, run_registration=False, ops=ops)
-        # TODO: Auxiliary file info is not extracted as expected in the GUI and may want to check why (extraction ran before classification causes bad classification)
+        im_path = suite2p_path / 'im_bg.npy'
+        np.save(im_path, image)
+        # Needed for the extraction and addition of ROIs
+        _ = suite2p.io.BinaryFile(Ly=image.shape[1], Lx=image.shape[2], filename=im_path)  # reads in data from npy
+        _ = suite2p.io.BinaryFile(Ly=image.shape[1], Lx=image.shape[2], filename=suite2p_path / 'data.bin',
+                                  n_frames=image.shape[0])  # writes data into a bin file
+
+        # The following is from suite2p.pipeline(image, run_registration=False, ops=ops, stat=stat)
+        # TODO: Auxiliary file info is not extracted as expected in the GUI and may want to check why (extraction ran before classification causes null classification)
         stat, F, Fneu, _, _ = suite2p.extraction.extraction_wrapper(stat, image, f_reg_chan2=None, ops=ops)
         dF = F.copy() - ops['neucoeff'] * Fneu
         dF = suite2p.extraction.preprocess(F=dF, baseline=ops['baseline'],
@@ -62,7 +69,7 @@ def edit_roi_mask(image, save_path):
         spks = suite2p.extraction.oasis(F=dF, batch_size=ops['batch_size'],
                                         tau=ops['tau'], fs=ops['fs'])
 
-        # Suite2p gui needs the following files to open mask
+        # Suite2p gui needs the following files to open ROI mask
         np.save(suite2p_path / 'stat.npy', stat)
         np.save(suite2p_path / 'iscell.npy', iscell)
         # Auxiliary files
@@ -70,16 +77,6 @@ def edit_roi_mask(image, save_path):
         np.save(suite2p_path / 'F.npy', F)
         np.save(suite2p_path / 'Fneu.npy', Fneu)
         np.save(suite2p_path / 'spks.npy', spks)
-
-        np.save(suite2p_path / 'stat_orig.npy', stat)
-        '''
-
-        # Runs suite2p pipeline
-        suite2p.pipeline(image, run_registration=False, ops=ops, stat=stat)
-
-        # Saves original iscell file in place of pipeline one, which is wrong
-        # TODO: fix pipeline iscell
-        np.save(suite2p_path / 'iscell.npy', iscell)
 
         # Runs suite2p GUI
         subprocess.run('suite2p')

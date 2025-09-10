@@ -13,10 +13,16 @@ def get_bmi_settings(fr = 38.6) -> dict:
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
             'chan_data': {
-                'gfp_idx': 1,
-                'gpmt_idx': 0,
-                'rfp_idx': 0,
-                'rpmt_idx': 1,
+                'green': {
+                    'label': 'g',
+                    'fp_idx': 1,
+                    'pmt_idx': 0
+                },
+                'red': {
+                    'label': 'r',
+                    'fp_idx': 0,
+                    'pmt_idx': 1
+                }
             }
         },
 

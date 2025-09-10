@@ -37,11 +37,11 @@ if __name__ == '__main__':
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(f"{exp_info['sldy_dir_win']}/{exp_info['sldy_name_test']}"), # Make sure of existence before starting (w/ slidebook)
+        'sldy_path': Path(f"{exp_info['sldy_dir_mac']}/{exp_info['sldy_name_test']}"), # Make sure of existence before starting (w/ slidebook)
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
-        'save_path': Path(f"{exp_info['save_base_dir_win']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}"),
-        'test_data': np.load(exp_info['test_data_win'])
+        'save_path': Path(f"{exp_info['save_base_dir_mac']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}"),
+        'test_data': np.load(exp_info['test_data_mac'])
     }
     path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
@@ -50,13 +50,14 @@ if __name__ == '__main__':
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    roi_info = roi_acqnvs_3i(task_set, path_data, 0, True, True)
-    exit()
+    roi_info = roi_acqnvs_3i(task_set, path_data, 0, task_set['im']['chan_data']['green'], [{}], 0, True, True)
+    # Example of extracting info from another channel and appending it to roi_data['chan']
+    #roi_info = roi_acqnvs_3i(task_set, path_data, 0, task_set['im']['chan_data']['red'], roi_info['roi_data'].item()['chan'], 1, True, True)
 
     '''
         Baseline Acquisition
     '''
-    #roi_data = roi_info['roi_data'].item()
+    roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
     bdata = baseline_acqnvs_3i(task_set, path_data, [], 17,False, True)

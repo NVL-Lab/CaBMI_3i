@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from wait_on_reader_3i import wait_for_reader
+from wait_on_task_3i import wait_for_reader
 from rois.scale_im_interactive import scale_im_interactive
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.obtain_roi_mask_suite2p import get_roi_mask
@@ -24,7 +24,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
 
     # Single image is used to locate ROIs
     # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-    im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, chan_data['fp_idx'], True)
+    im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
     #im_raw = path_data['test_data'][99]
 
     # Scale image to see ROIs better

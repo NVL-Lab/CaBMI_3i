@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import numpy as np
 import time
 
-from wait_on_reader_3i import wait_for_reader
+from wait_on_task_3i import wait_for_reader
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio

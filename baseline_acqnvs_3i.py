@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from contextlib import contextmanager
 
-from wait_on_reader_3i import wait_for_reader
+from wait_on_task_3i import wait_for_reader, wait_for_capture
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
 from params.play_tone import play_tone
@@ -35,10 +35,15 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     # Save path
     bdata_path = path_data['save_path'] / f'{bname}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
     sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    # May need to be wait for reader again instead of capture
+    sb_file_reader = wait_for_capture(sb_file_reader, capture)
+
+    '''
     while sb_file_reader.GetNumCaptures() < capture+1:
         capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
         #sb_file_reader.Refresh(capture)
+    '''
 
     save_path_expt = path_data['save_path'] / 'im' / 'baseline'
     save_path_expt.mkdir(parents=True, exist_ok=True)

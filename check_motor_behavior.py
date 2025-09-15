@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 
 from save_files_3i import save_files_3i
 from params.play_tone import play_tone
-from wait_on_reader_3i import wait_for_reader
+from wait_on_task_3i import wait_for_reader
 
 def check_motor_behavior(tset, path_data, capture, expt_str, plot=False, run=False):
     """

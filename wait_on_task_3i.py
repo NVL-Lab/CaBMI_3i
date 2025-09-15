@@ -19,3 +19,21 @@ def wait_for_reader(file_path, wait_seconds=500):
         time.sleep(1)
     print("Giving up.")
     exit(1)
+
+def wait_for_capture(reader, capture, wait_seconds=500):
+    for attempt in range(wait_seconds):
+        if reader.GetNumCaptures() < capture + 1:
+            try:
+                reader.Refresh(capture)
+                return reader
+            except Exception as e:
+                print(f"Attempt {attempt + 1}: capture not available, retrying...")
+        else:
+            if attempt == 0:
+                print(
+                    f"Capture {capture} does not exist. Retrying for up to {wait_seconds} seconds\n"
+                    "Press Ctrl+C to exit."
+                )
+        time.sleep(1)
+    print("Giving up.")
+    exit(1)

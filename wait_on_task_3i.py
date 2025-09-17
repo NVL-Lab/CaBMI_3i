@@ -20,20 +20,22 @@ def wait_for_reader(file_path, wait_seconds=500):
     print("Giving up.")
     exit(1)
 
-def wait_for_capture(reader, capture, wait_seconds=500):
+def wait_for_capture(file_path, reader, capture, wait_seconds=500):
+    # ~45 frames to start recording
+    # may need to change 3i code
     for attempt in range(wait_seconds):
         if reader.GetNumCaptures() < capture + 1:
             try:
+                print("Reopening sldy...")
+                reader = SBReadFile()
+                reader.Open(str(file_path), All=False)
                 reader.Refresh(capture)
                 return reader
             except Exception as e:
-                print(f"Attempt {attempt + 1}: capture not available, retrying...")
+                #print(f"Attempt {attempt + 1}: capture not available, retrying...")
+                print('hello')
         else:
-            if attempt == 0:
-                print(
-                    f"Capture {capture} does not exist. Retrying for up to {wait_seconds} seconds\n"
-                    "Press Ctrl+C to exit."
-                )
-        time.sleep(1)
+            return reader
+        #time.sleep(0.0001)
     print("Giving up.")
     exit(1)

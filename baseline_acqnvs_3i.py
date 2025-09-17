@@ -36,7 +36,8 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     bdata_path = path_data['save_path'] / f'{bname}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
     sb_file_reader = wait_for_reader(path_data['sldy_path'])
     # May need to be wait for reader again instead of capture
-    sb_file_reader = wait_for_capture(sb_file_reader, capture)
+    #sb_file_reader = wait_for_capture(sb_file_reader, capture)
+    sb_file_reader = wait_for_capture(path_data['sldy_path'], sb_file_reader, capture)
 
     '''
     while sb_file_reader.GetNumCaptures() < capture+1:

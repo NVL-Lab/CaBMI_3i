@@ -95,7 +95,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             print(f'*** Time Point: {curr_time_point}')
             image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point-1, z_plane, task_set['im']['chan_data']['green']['pmt_idx'], True)  # recording is different index
 
-            #if not np.array_equal(image, last_image):
+            # check desired amount of frames start perhaps start recording past 50
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
                 frames_captured += 1

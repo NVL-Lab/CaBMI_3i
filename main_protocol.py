@@ -60,7 +60,7 @@ if __name__ == '__main__':
     #roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, [], 8,True, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, [], 6,True, True)
     exit()
     #bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 1, True, True)
 

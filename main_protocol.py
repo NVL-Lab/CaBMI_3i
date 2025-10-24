@@ -1,4 +1,4 @@
-author_= 'Saul Gurgua Lopez'
+__author__= 'Saul Gurgua Lopez'
 
 import numpy as np
 from pathlib import Path

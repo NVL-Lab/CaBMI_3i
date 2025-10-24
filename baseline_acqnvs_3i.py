@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from contextlib import contextmanager
 
-from wait_on_task_3i import wait_for_reader, wait_for_capture
+from wait_on_task_3i import wait_for_reader_with_capture
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
 from params.play_tone import play_tone
@@ -34,10 +34,9 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
 
     # Save path
     bdata_path = path_data['save_path'] / f'{bname}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
-    sb_file_reader = wait_for_reader(path_data['sldy_path'])
-    # May need to be wait for reader again instead of capture
-    #sb_file_reader = wait_for_capture(sb_file_reader, capture)
-    sb_file_reader = wait_for_capture(path_data['sldy_path'], sb_file_reader, capture)
+
+    # Creates an instance of slidebook reader
+    sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
 
     '''
     while sb_file_reader.GetNumCaptures() < capture+1:
@@ -53,10 +52,12 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
 
     # Initialize baseline variables
-    #number_neurons = int(np.max(roi_mask))
-    #strc_mask = obtain_strc_mask_from_mask(roi_mask)
-    #base_activity = np.full((number_neurons, expected_length), np.nan)
-    base_activity = np.full((200, 390, 403), np.nan)
+    #'''
+    number_neurons = int(np.max(roi_mask))
+    strc_mask = obtain_strc_mask_from_mask(roi_mask)
+    base_activity = np.full((number_neurons, expected_length), np.nan)
+    #'''
+    #base_activity = np.full((200, 390, 403), np.nan) # FOR TESTING
 
     frame = 0
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
@@ -104,9 +105,9 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                 #last_image = image  # comparison and assignment
 
                 # Store ROI data
-                # unit_vals = get_roi(image, strc_mask)
-                # base_activity[:, frame] = unit_vals
-                base_activity[frame] = image
+                unit_vals = get_roi(image, strc_mask)
+                base_activity[:, frame] = unit_vals
+                #base_activity[frame] = image # FOR TESTING
                 frame += 1
                 counter_same = 0
 

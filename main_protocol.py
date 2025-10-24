@@ -50,7 +50,7 @@ if __name__ == '__main__':
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    #roi_info = roi_acqnvs_3i(task_set, path_data, 1, task_set['im']['chan_data']['green'], [{}], 0, True, True)
+    roi_info = roi_acqnvs_3i(task_set, path_data, 1, task_set['im']['chan_data']['green'], [{}], 0, True, True)
     # Example of extracting info from another channel and appending it to roi_data['chan']
     #roi_info = roi_acqnvs_3i(task_set, path_data, 0, task_set['im']['chan_data']['red'], roi_info['roi_data'].item()['chan'], 1, True, True)
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     #roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, [], 6,True, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, [], 4,True, True)
     exit()
     #bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 1, True, True)
 
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     # Define the type of experiment and run the BMI acquisition
     bmi_data = bmi_acqnvs_3i(task_set, path_data, 2, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
-                             0, [], np.ones(len(e1_base) + len(e2_base)) * np.nan, fb_set['fb_bool'], fb_cal, False, True)
+                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, False, True)
 
     # If motor behavior experiment, run this
     check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

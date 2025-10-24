@@ -1,3 +1,5 @@
+#from datetime import datetime
+
 def get_exp_info() -> dict:
     return {
         # Actual directories
@@ -20,6 +22,6 @@ def get_exp_info() -> dict:
         # Experiment directories
         'animal': 'mouse0', # ago23
         'day': 'D0',        # DF
-        'date': '040925',   # 230423
+        'date': '040925',   # datetime.today().strftime('%d%m%y') 230423
         'expt': 'bmi_stim'  # bmi_stim
     }

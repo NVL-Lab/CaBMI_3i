@@ -52,12 +52,12 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
 
     # Initialize baseline variables
-    #'''
+    '''
     number_neurons = int(np.max(roi_mask))
     strc_mask = obtain_strc_mask_from_mask(roi_mask)
     base_activity = np.full((number_neurons, expected_length), np.nan)
-    #'''
-    #base_activity = np.full((200, 390, 403), np.nan) # FOR TESTING
+    '''
+    base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
 
     frame = 0
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
@@ -105,9 +105,9 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                 #last_image = image  # comparison and assignment
 
                 # Store ROI data
-                unit_vals = get_roi(image, strc_mask)
-                base_activity[:, frame] = unit_vals
-                #base_activity[frame] = image # FOR TESTING
+                #unit_vals = get_roi(image, strc_mask)
+                #base_activity[:, frame] = unit_vals
+                base_activity[frame] = image # FOR TESTING
                 frame += 1
                 counter_same = 0
 

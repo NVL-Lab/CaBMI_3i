@@ -29,6 +29,8 @@ def get_roi_mask(image, save_path):
     ops['anatomical_only'] = 2
     ops['nbinned'] = 1
     ops['fs'] = 1
+    ops['cellpose_use_gpu'] = True # need to have cellpose run with gpu for fast processing
+    ops['verbose'] = True # optional
 
     ops, stat = suite2p.detection_wrapper(f_reg=image, ops=ops, classfile=suite2p.classification.builtin_classfile)
     iscell = suite2p.classification.classify(stat, suite2p.classification.builtin_classfile) # Typically ran after extraction

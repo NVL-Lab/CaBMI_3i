@@ -60,7 +60,7 @@ def get_bmi_settings(fr = 38.6) -> dict:
         'cursor_zscore_bool': False,
         'reward_delay_frames': 10,
         'back2base_frame_thresh': 2,   #2 frames of back2base
-        'relaxationTime': 0,         # Period after a hit to stop the BMI
+        'relaxation_time': 0,         #1 Period after a hit to stop the BMI (there can't be another hit in this many sec)
         'b2base_coeff': 0.5,
 
         # Stim Delay

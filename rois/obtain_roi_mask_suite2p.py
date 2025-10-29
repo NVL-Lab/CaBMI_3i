@@ -26,13 +26,19 @@ def get_roi_mask(image, save_path):
     image = np.array([image]) # suite2p expects several frames (Lx, Ly, Lz)
 
     ops = suite2p.default_ops()
+    '''
+        In order to run cellpose (anatomical) with gpu (cpu execution is slow) remove the following pip packages:
+            torch, torchvision, torchaudio
+        Install the latest versions via pip or conda (specify pytorch-cuda)
+    '''
     ops['anatomical_only'] = 2
     ops['nbinned'] = 1
     ops['fs'] = 1
-    ops['cellpose_use_gpu'] = True # need to have cellpose run with gpu for fast processing
-    ops['verbose'] = True # optional
-
+    #ops['cellpose_use_gpu'] = True # need to have cellpose run with gpu for fast processing
+    #ops['verbose'] = True # optional
+    print('Detecting ROIs...')
     ops, stat = suite2p.detection_wrapper(f_reg=image, ops=ops, classfile=suite2p.classification.builtin_classfile)
+    print('Classifying cells...')
     iscell = suite2p.classification.classify(stat, suite2p.classification.builtin_classfile) # Typically ran after extraction
 
     roi_mask = create_roi_mask(image, stat, iscell)
@@ -55,10 +61,13 @@ def get_roi_mask(image, save_path):
         im_path = suite2p_path / 'im_bg.npy'
         np.save(im_path, image)
         # Needed for the extraction and addition of ROIs
+        print('Binarizing data...')
         _ = suite2p.io.BinaryFile(Ly=image.shape[1], Lx=image.shape[2], filename=im_path)  # reads in data from npy
         _ = suite2p.io.BinaryFile(Ly=image.shape[1], Lx=image.shape[2], filename=suite2p_path / 'data.bin',
                                   n_frames=image.shape[0])  # writes data into a bin file
 
+        # The following will not work on pollen data or could just be because it's a simple capture
+        print('Extracting neuronal data...')
         # The following is from suite2p.pipeline(image, run_registration=False, ops=ops, stat=stat)
         # TODO: Auxiliary file info is not extracted as expected in the GUI and may want to check why (extraction ran before classification causes null classification)
         stat, F, Fneu, _, _ = suite2p.extraction.extraction_wrapper(stat, image, f_reg_chan2=None, ops=ops)
@@ -81,6 +90,7 @@ def get_roi_mask(image, save_path):
         np.save(suite2p_path / 'spks.npy', spks)
 
         # Runs suite2p GUI
+        print('Running suite2p...')
         subprocess.run('suite2p')
 
         roi_mask = create_roi_mask(image, np.load(suite2p_path / 'stat.npy', allow_pickle=True), np.load(suite2p_path / 'iscell.npy'))

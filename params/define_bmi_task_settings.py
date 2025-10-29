@@ -15,13 +15,13 @@ def get_bmi_settings(fr = 38.6) -> dict:
             'chan_data': {
                 'green': {
                     'label': 'g',
-                    'fp_idx': 1,
-                    'pmt_idx': 0
+                    'fp_idx': 0, # in windows its 0; last time 1
+                    'pmt_idx': 1 #0
                 },
                 'red': {
                     'label': 'r',
-                    'fp_idx': 0,
-                    'pmt_idx': 1
+                    'fp_idx': 1, #0
+                    'pmt_idx': 0 #1
                 }
             }
         },

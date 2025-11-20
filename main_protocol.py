@@ -1,4 +1,4 @@
-author_= 'Saul Gurgua Lopez'
+__author__= 'Saul Gurgua Lopez'
 
 import numpy as np
 from pathlib import Path
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     # Define the type of experiment and run the BMI acquisition
     bmi_data = bmi_acqnvs_3i(task_set, path_data, 2, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
-                             0, [], np.ones(len(e1_base) + len(e2_base)) * np.nan, fb_set['fb_bool'], fb_cal, False, True)
+                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, False, True)
 
     # If motor behavior experiment, run this
     check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

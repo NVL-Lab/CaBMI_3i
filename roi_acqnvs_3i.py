@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from wait_on_task_3i import wait_for_reader
+from wait_on_task_3i import wait_for_reader_with_capture
 from rois.scale_im_interactive import scale_im_interactive
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.obtain_roi_mask_suite2p import get_roi_mask
@@ -17,10 +17,13 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
 
-    sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    # Creates an instance of slidebook reader
+    sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
+    '''
     while sb_file_reader.GetNumCaptures() < capture + 1:
         capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
+    '''
 
     # Single image is used to locate ROIs
     # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return

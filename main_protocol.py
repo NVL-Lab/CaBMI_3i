@@ -50,9 +50,9 @@ if __name__ == '__main__':
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    #roi_info = roi_acqnvs_3i(task_set, path_data, 1, task_set['im']['chan_data']['green'], [{}], 0, True, True)
+    roi_info = roi_acqnvs_3i(task_set, path_data, 0, task_set['im']['chan_data']['green'], [{}], 0, True, True)
     # Example of extracting info from another channel and appending it to roi_data['chan']
-    #roi_info = roi_acqnvs_3i(task_set, path_data, 0, task_set['im']['chan_data']['red'], roi_info['roi_data'].item()['chan'], 1, True, True)
+    #roi_info = roi_acqnvs_3i(task_set, path_data, 1, task_set['im']['chan_data']['red'], roi_info['roi_data'].item()['chan'], 1, True, True)
 
     '''
         Baseline Acquisition
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     #roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, [], 6,True, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, [], 4,True, True)
     exit()
     #bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 1, True, True)
 

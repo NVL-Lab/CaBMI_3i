@@ -22,6 +22,7 @@ def wait_for_reader(file_path, wait_seconds=500):
 
 def wait_for_capture(file_path, reader, capture):
     # ~33-40 frames to start recording
+    # ~20 if no captures are available before
     try:
         while reader.GetNumCaptures() < capture + 1:
             print("Finding Capture...")

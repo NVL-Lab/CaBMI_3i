@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from contextlib import contextmanager
+import time
 
 from wait_on_task_3i import wait_for_reader_with_capture
 from rois.scale_im_interactive import scale_im_interactive
@@ -56,46 +57,47 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     '''
 
     #CONTINUE WORKING HERE
-    # Check suite2p's way of creating the mean image and use that method.
-    sleep_sec = 0.01
-    max_wait_sec = 5 # wait at most 5 seconds. If over this, quit
-    no_progress = 0
+    image_data = np.full((2316, 390, 403), np.nan)
+    frame = 0
+    counter_same = 0
+    temp_time_point = 0
+    frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
-    first_tp = 0
-    tps = sb_file_reader.GetNumTimepoints(capture)
+    loop_duration_sec = 0
     try:
-        for theRetry in range(0, 10000):
-            for tp in range(first_tp, tps):
-                print(f'*** Time Point: {tp}')
-                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, tp, z_plane, 0, True)
-
-            # see if there are any new timepoints
+        while counter_same < 1000 and loop_duration_sec <= 60:
             sb_file_reader.Refresh(capture)
-            if first_tp == tps:
-                no_progress += 1
-                time.sleep(sleep_sec)  # sleep 10 ms
-                theTimePaused += sleep_sec
+            curr_time_point = sb_file_reader.GetNumTimepoints(capture)
+            print(f'*** Time Point: {curr_time_point}')
+            # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
+                                                     task_set['im']['chan_data']['green']['pmt_idx'],
+                                                     True)
+            if curr_time_point != temp_time_point:
+                temp_time_point = curr_time_point
+                start_time = time.perf_counter()
+
+                image_data[frame] = image
+                frame += 1
+                counter_same = 0
+
+                elapsed_time = time.perf_counter() - start_time
+                loop_duration_sec = loop_duration_sec + elapsed_time
+                print(f'Execution time: {elapsed_time} seconds')
+
+                if elapsed_time < frame_interval:
+                    time.sleep(frame_interval - elapsed_time)
             else:
-                no_progress = 0
-            time.sleep(sleep_sec)
+                counter_same += 1
+    except KeyboardInterrupt:
+        print('Keyboard Interrupt')
 
-            # if we have waited too long, quit
-            if no_progress * sleep_sec > maxWaitS:
-                break
-
-            # loop again
-            first_tp = tps
-            tps = sb_file_reader.GetNumTimepoints(capture) - 1
-
-    except:
-        print("Keyboard Interrupt")
-
-    # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-
+    # Check suite2p's way of creating the mean image and use that method.
+    im_raw = np.nanmean(image_data, axis=0)
 
     # Single image is used to locate ROIs (Old method)
-    im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
+    #im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
     #im_raw = path_data['test_data'][99]
 
     # Scale image to see ROIs better

@@ -57,7 +57,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     '''
 
     #CONTINUE WORKING HERE
-    image_data = np.full((2316, 390, 403), np.nan)
+    image_data = np.full((2316, 390, 403), np.nan) # (403, 390)?
     frame = 0
     counter_same = 0
     temp_time_point = 0
@@ -65,6 +65,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
     loop_duration_sec = 0
+    # Does not stop at a min
     try:
         while counter_same < 1000 and loop_duration_sec <= 60:
             sb_file_reader.Refresh(capture)
@@ -72,7 +73,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
             print(f'*** Time Point: {curr_time_point}')
             # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
             image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                     task_set['im']['chan_data']['green']['pmt_idx'],
+                                                     task_set['im']['chan_data']['red']['pmt_idx'],
                                                      True)
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point

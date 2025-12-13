@@ -1,7 +1,8 @@
+from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(fr = 38.6) -> dict:
+def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dict:
     #fr = 29.752 # Prairie
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
@@ -9,6 +10,7 @@ def get_bmi_settings(fr = 38.6) -> dict:
 
         # Imaging
         'im': {
+            'resolution': res,
             'frame_rate': fr,
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known

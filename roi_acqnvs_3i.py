@@ -9,7 +9,7 @@ from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_c
 from rois.obtain_roi_mask_suite2p import get_roi_mask
 
 @contextmanager
-def on_cleanup(bdata_path, base_activity):
+def on_cleanup(roi_data_path, roi_activity):
     try:
         yield
     except KeyboardInterrupt:
@@ -17,7 +17,7 @@ def on_cleanup(bdata_path, base_activity):
     finally:
         print('Cleaning...')
         # consider storing everything under an npz
-        np.save(bdata_path, base_activity, allow_pickle=True)
+        np.save(roi_data_path, roi_activity, allow_pickle=True)
 
 def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_idx, see_roi_data_flag=False, run=False) -> np.array:
     """
@@ -56,8 +56,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
     '''
 
-    #CONTINUE WORKING HERE
-    image_data = np.full((2316, 390, 403), np.nan) # (403, 390)?
+    minute_recording_len = task_set['im']['frame_rate'] * 60
+    image_data = np.full((minute_recording_len, task_set['im']['resolution'][0], task_set['im']['resolution'][1]), np.nan)
     frame = 0
     counter_same = 0
     temp_time_point = 0
@@ -65,9 +65,10 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
     loop_duration_sec = 0
-    # Does not stop at a min
-    try:
-        while counter_same < 1000 and loop_duration_sec <= 60:
+    # Does not stop at a min; check with new approach
+    with on_cleanup(roi_data_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
+        while counter_same < 1000 and int(np.sum(np.isnan(image_data).all(axis=(1, 2)))) != 0: # all arrays should be filled with non-naan's
+            # while counter_same < 1000 and loop_duration_sec <= 60
             sb_file_reader.Refresh(capture)
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
             print(f'*** Time Point: {curr_time_point}')
@@ -91,8 +92,6 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
                     time.sleep(frame_interval - elapsed_time)
             else:
                 counter_same += 1
-    except KeyboardInterrupt:
-        print('Keyboard Interrupt')
 
     # Check suite2p's way of creating the mean image and use that method.
     im_raw = np.nanmean(image_data, axis=0)

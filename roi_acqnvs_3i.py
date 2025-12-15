@@ -17,7 +17,8 @@ def on_cleanup(roi_data_path, roi_activity):
     finally:
         print('Cleaning...')
         # consider storing everything under an npz
-        np.save(roi_data_path, roi_activity, allow_pickle=True)
+        # ROI recording will be save in npy, while the rest will be npz
+        #np.save(roi_data_path, roi_activity, allow_pickle=True)
 
 def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_idx, see_roi_data_flag=False, run=False) -> np.array:
     """
@@ -56,8 +57,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
     '''
 
-    minute_recording_len = task_set['im']['frame_rate'] * 60
-    image_data = np.full((minute_recording_len, task_set['im']['resolution'][0], task_set['im']['resolution'][1]), np.nan)
+    minute_recording_len = task_set['im']['frame_rate'] * 60 + 1 # Goes exactly to the shape of the array. fix to not add 1
+    image_data = np.full((int(minute_recording_len), task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
     frame = 0
     counter_same = 0
     temp_time_point = 0
@@ -67,7 +68,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     loop_duration_sec = 0
     # Does not stop at a min; check with new approach
     with on_cleanup(roi_data_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
-        while counter_same < 1000 and int(np.sum(np.isnan(image_data).all(axis=(1, 2)))) != 0: # all arrays should be filled with non-naan's
+        while counter_same < 1000: # all arrays should be filled with non-naan's
+            # int(np.sum(np.isnan(image_data).all(axis=(1, 2)))) != 0 # too slow, use time
             # while counter_same < 1000 and loop_duration_sec <= 60
             sb_file_reader.Refresh(capture)
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)

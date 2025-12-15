@@ -7,7 +7,8 @@ def create_roi_mask(image, stat, iscell):
     roi_mask = np.zeros((image.shape[2], image.shape[1]), dtype=np.int64) #(Lx, Ly)
 
     cell_count = 0
-    for i, roi in enumerate(stat):
+    # ERROR IS HERE, index may go above x
+    for i, roi in enumerate(stat): # Check stat, see how it is shaped
         if iscell[i, 0]:
             cell_count += 1
             roi_mask[roi['ypix'], roi['xpix']] += cell_count  # * roi['lam'] # Intensities

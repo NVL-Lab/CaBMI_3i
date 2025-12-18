@@ -57,8 +57,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
     '''
 
-    minute_recording_len = task_set['im']['frame_rate'] * 60 + 1 # Goes exactly to the shape of the array. fix to not add 1
-    image_data = np.full((int(minute_recording_len), task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+    minute_recording_len = int(task_set['im']['frame_rate'] * 60 + 1) # Goes exactly to the shape of the array. fix to not add 1
+    image_data = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
     frame = 0
     counter_same = 0
     temp_time_point = 0
@@ -96,6 +96,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
                 counter_same += 1
 
     # Check suite2p's way of creating the mean image and use that method.
+    #image_data = np.load('F:cabmi/bmi_test/slidebook/capture_slide.dir/Streamtodisk-1765822852-121.imgdir/ImageData_Ch0_TP0000000.npy')
+    # Don't create a mean. Pass to suite2p frame by frame
     im_raw = np.nanmean(image_data, axis=0)
 
     # Single image is used to locate ROIs (Old method)

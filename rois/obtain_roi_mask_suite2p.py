@@ -4,15 +4,40 @@ import suite2p
 import subprocess
 
 def create_roi_mask(image, stat, iscell):
-    roi_mask = np.zeros((image.shape[2], image.shape[1]), dtype=np.int64) #(Lx, Ly)
+    roi_mask = np.zeros((image.shape[1], image.shape[2]), dtype=np.int64) #(Lx, Ly)
+    roi_mask_false = roi_mask.copy()
 
-    cell_count = 0
-    # ERROR IS HERE, index may go above x
+    #cell_count = 0
+    #false_cell_count = 0
+
+    cell_indexes = np.where(iscell[:, 0] == 1)[0].tolist()
+    false_cell_indexes = np.where(iscell[:, 0] == 0)[0].tolist()
+
     for i, roi in enumerate(stat): # Check stat, see how it is shaped
-        if iscell[i, 0]:
-            cell_count += 1
-            roi_mask[roi['ypix'], roi['xpix']] += cell_count  # * roi['lam'] # Intensities
+        j = i+1
+        if i in cell_indexes: #if iscell[i, 0]:
+            #cell_count += 1
+            #roi_mask[roi['ypix'], roi['xpix']] += cell_count
+            # Intensities: roi['lam']
+            roi_mask[roi['ypix'], roi['xpix']] = j
+        else:
+            #false_cell_count += 1
+            roi_mask_false[roi['ypix'], roi['xpix']] = j
 
+    fig, axes = plt.subplots(1, 2)
+    axes[0].imshow(image[0], cmap='bone')
+    cells = axes[0].imshow(roi_mask, cmap='nipy_spectral', alpha=0.7)
+    axes[0].set_title(f'ROI Mask: {len(cell_indexes)} Neurons')
+    fig.colorbar(cells, ax=axes[0], label="ROI Label Index")
+    axes[1].imshow(image[0], cmap='bone')
+    false_cells = axes[1].imshow(roi_mask_false, cmap='nipy_spectral', alpha=0.7)
+    axes[1].set_title(f'{len(false_cell_indexes)} ROIs are not cells')
+    fig.colorbar(false_cells, ax=axes[1], label="ROI Label Index")
+
+    plt.show()
+    plt.close()
+
+    '''
     plt.figure()
     plt.imshow(image[0], cmap='bone')
     plt.imshow(roi_mask, cmap='nipy_spectral', alpha=0.7)
@@ -20,6 +45,7 @@ def create_roi_mask(image, stat, iscell):
     plt.colorbar(label="ROI Label Index")
     plt.show()
     plt.close()
+    '''
 
     return roi_mask
 

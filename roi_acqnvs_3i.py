@@ -20,7 +20,7 @@ def on_cleanup(roi_data_path, roi_activity):
         # ROI recording will be save in npy, while the rest will be npz
         #np.save(roi_data_path, roi_activity, allow_pickle=True)
 
-def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_idx, see_roi_data_flag=False, run=False) -> np.array:
+def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_data_flag=False, run=False) -> np.array:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -28,9 +28,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
             task_set: dictionary with bmi parameters
             path_data: paths to experiment data
             capture: integer denoting the desired capture within 3i .sldy file
-            chan_data: dictionary with desired channel information
+            channel: type of channel
             roi_chan_data: list with channel and ROI data
-            chan_idx: integer denoting channel index for roi_chan_data
             see_roi_data_flag: bool used to determine if ROIs should be plotted
             run: bool used to determine if the code should be run (typically ran unless code has been ran already)
 
@@ -57,9 +56,11 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
         sb_file_reader = wait_for_reader(path_data['sldy_path'])
     '''
 
-    minute_recording_len = int(task_set['im']['frame_rate'] * 60 + 1) # Goes exactly to the shape of the array. fix to not add 1
+    chan_data = task_set['im']['chan_data'][channel]
+
+    minute_recording_len = int(task_set['im']['frame_rate'] * 60)
     image_data = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
-    frame = 0
+    frame_counter = 0
     counter_same = 0
     temp_time_point = 0
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
@@ -68,7 +69,9 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     loop_duration_sec = 0
     # Does not stop at a min; check with new approach
     with on_cleanup(roi_data_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
-        while counter_same < 1000: # all arrays should be filled with non-naan's
+        while counter_same < 1000:
+            if frame_counter >= minute_recording_len: #nope
+                break
             # int(np.sum(np.isnan(image_data).all(axis=(1, 2)))) != 0 # too slow, use time
             # while counter_same < 1000 and loop_duration_sec <= 60
             sb_file_reader.Refresh(capture)
@@ -76,14 +79,14 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
             print(f'*** Time Point: {curr_time_point}')
             # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
             image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                     task_set['im']['chan_data']['red']['pmt_idx'],
+                                                     chan_data['pmt_idx'],
                                                      True)
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
                 start_time = time.perf_counter()
 
-                image_data[frame] = image
-                frame += 1
+                image_data[frame_counter] = image
+                frame_counter += 1
                 counter_same = 0
 
                 elapsed_time = time.perf_counter() - start_time
@@ -99,6 +102,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     #image_data = np.load('F:cabmi/bmi_test/slidebook/capture_slide.dir/Streamtodisk-1765822852-121.imgdir/ImageData_Ch0_TP0000000.npy')
     # Don't create a mean. Pass to suite2p frame by frame
     im_raw = np.nanmean(image_data, axis=0)
+    print(len(image_data))
 
     # Single image is used to locate ROIs (Old method)
     #im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
@@ -125,7 +129,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, chan_data, roi_chan_data, chan_i
     print('Obtaining ROI mask!')
     print('----------------------------------------')
     roi_mask = get_roi_mask(im_bg, path_data['save_path'])
-    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, chan_data['label'], chan_idx)
+    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, chan_data['label'])
 
     # See ROI if needed
     if see_roi_data_flag:

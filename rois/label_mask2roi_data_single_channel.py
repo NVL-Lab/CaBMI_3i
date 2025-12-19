@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from skimage.color import gray2rgb
 from .roi_bin_cell2center_radius import roi_bin_cell2center_radius
 
-def label_mask2roi_data_single_channel(im_bg, label_mask, temp_data, chan_label, chan_idx):
+def label_mask2roi_data_single_channel(im_bg, label_mask, temp_data, chan_label):
     roi_data = {}
 
     roi_data['im_bg'] = gray2rgb(im_bg)  # Convert grayscale to RGB
@@ -38,13 +38,13 @@ def label_mask2roi_data_single_channel(im_bg, label_mask, temp_data, chan_label,
     im_roi_rg[:, :, 1] = g_mod
     roi_data['im_roi_rg'] = im_roi_rg
 
-    roi_data['chan'] = temp_data
-    #chan_idx = len(temp_data)
-    roi_data['chan'][chan_idx]['label'] = chan_label
-    roi_data['chan'][chan_idx]['num_rois'] = roi_data['num_rois']
-    roi_data['chan'][chan_idx]['idxs'] = list(range(1, roi_data['num_rois'] + 1))
-    roi_data['chan'][chan_idx]['im_roi'] = roi_data['im_roi']
-    roi_data['chan'][chan_idx]['roi_mask'] = label_mask
-    roi_data['chan'][chan_idx]['roi_mask_bin'] = roi_data['roi_mask_bin']
+    roi_data['channel'] = temp_data
+    chan_idx = len(temp_data)
+    roi_data['channel'][chan_idx]['label'] = chan_label
+    roi_data['channel'][chan_idx]['num_rois'] = roi_data['num_rois']
+    roi_data['channel'][chan_idx]['idxs'] = list(range(1, roi_data['num_rois'] + 1))
+    roi_data['channel'][chan_idx]['im_roi'] = roi_data['im_roi']
+    roi_data['channel'][chan_idx]['roi_mask'] = label_mask
+    roi_data['channel'][chan_idx]['roi_mask_bin'] = roi_data['roi_mask_bin']
 
     return roi_data

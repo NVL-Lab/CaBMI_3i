@@ -58,7 +58,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
 
     chan_data = task_set['im']['chan_data'][channel]
 
-    minute_recording_len = int(task_set['im']['frame_rate'] * 60)
+    minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
     image_data = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
     frame_counter = 0
     counter_same = 0
@@ -67,13 +67,11 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
     loop_duration_sec = 0
-    # Does not stop at a min; check with new approach
     with on_cleanup(roi_data_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
         while counter_same < 1000:
-            if frame_counter >= minute_recording_len: #nope
+            # Stops recording when buffer is full
+            if frame_counter >= minute_recording_len:
                 break
-            # int(np.sum(np.isnan(image_data).all(axis=(1, 2)))) != 0 # too slow, use time
-            # while counter_same < 1000 and loop_duration_sec <= 60
             sb_file_reader.Refresh(capture)
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
             print(f'*** Time Point: {curr_time_point}')

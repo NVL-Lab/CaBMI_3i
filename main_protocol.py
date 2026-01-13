@@ -51,7 +51,7 @@ if __name__ == '__main__':
             Capture the image and input the capture index
     '''
     # Check task_set['im']['chan_data']['green'].
-    roi_info = roi_acqnvs_3i(task_set, path_data, 2, 'red', [{}], True, True)
+    roi_info = roi_acqnvs_3i(task_set, path_data, 0, 'red', [{}], True, True)
     # Example of extracting info from another channel and appending it to roi_data['chan']
     #roi_info = roi_acqnvs_3i(task_set, path_data, 1, task_set['im']['chan_data']['red'], roi_info['roi_data'].item()['chan'], 1, True, True)
     exit()

@@ -52,14 +52,14 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
 
     # Initialize baseline variables
-    '''
+    #'''
     number_neurons = int(np.max(roi_mask))
     strc_mask = obtain_strc_mask_from_mask(roi_mask)
     base_activity = np.full((number_neurons, expected_length), np.nan)
-    '''
-    base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
+    #'''
+    #base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
 
-    frame = 0
+    frame_counter = 0
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
     #time_point_count = 8925
     plane_count = sb_file_reader.GetNumZPlanes(capture)
@@ -89,7 +89,9 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bdata_path, base_activity):
         while counter_same < 1000:
-            #for time_point in range(init_time_point, time_point_count):
+            # Stops recording when buffer is full
+            if frame_counter >= expected_length:
+                break
             sb_file_reader.Refresh(capture)  # Takes ~4ms
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
 
@@ -105,10 +107,11 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                 #last_image = image  # comparison and assignment
 
                 # Store ROI data
-                #unit_vals = get_roi(image, strc_mask)
-                #base_activity[:, frame] = unit_vals
-                base_activity[frame] = image # FOR TESTING
-                frame += 1
+                unit_vals = get_roi(image, strc_mask)
+                base_activity[:, frame_counter] = unit_vals
+
+                #base_activity[frame_counter] = image # FOR TESTING
+                #frame_counter += 1
                 counter_same = 0
 
                 elapsed_time = time.perf_counter() - start_time

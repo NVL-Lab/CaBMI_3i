@@ -36,14 +36,16 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
         Returns:
             test_info: dictionary containing dataframes with voltage data.
     """
-    roi_data_path = path_data['save_path'] / 'roi_data.npz'
+    roi_data_path = path_data['save_path'] / 'roi_data.npy'
+    roi_info_path = path_data['save_path'] / 'roi_info.npz'
 
     # Checks if ROI file already exists
     if not run:
         try:
             roi_data = np.load(roi_data_path, allow_pickle=True)
-            print(f'Loading {roi_data_path.name}')
-            return roi_data
+            roi_info = np.load(roi_info_path, allow_pickle=True)
+            print(f'Loading {roi_data_path.name} and {roi_info_path.name}')
+            return roi_data, roi_info
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
@@ -58,7 +60,8 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
 
     chan_data = task_set['im']['chan_data'][channel]
 
-    minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
+    #minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
+    minute_recording_len = 1130
     image_data = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
     frame_counter = 0
     counter_same = 0
@@ -100,7 +103,7 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
     #image_data = np.load('F:cabmi/bmi_test/slidebook/capture_slide.dir/Streamtodisk-1765822852-121.imgdir/ImageData_Ch0_TP0000000.npy')
     # Don't create a mean. Pass to suite2p frame by frame
     im_raw = np.nanmean(image_data, axis=0)
-    print(len(image_data))
+    #print(len(image_data))
 
     # Single image is used to locate ROIs (Old method)
     #im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
@@ -127,20 +130,20 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
     print('Obtaining ROI mask!')
     print('----------------------------------------')
     roi_mask = get_roi_mask(im_bg, path_data['save_path'])
-    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, chan_data['label'])
+    roi_info = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, chan_data['label'])
 
     # See ROI if needed
     if see_roi_data_flag:
         plt.figure()
-        plt.imshow(roi_data['roi_mask'], cmap='gray')
-        plt.title(f'ROI Mask. Num Roi: {roi_data["num_rois"]}')
+        plt.imshow(roi_info['roi_mask'], cmap='gray')
+        plt.title(f'ROI Mask. Num Roi: {roi_info["num_rois"]}')
         plt.show()
 
         plt.figure()
-        plt.imshow(roi_data['im_roi'], cmap='gray')
-        plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
+        plt.imshow(roi_info['im_roi'], cmap='gray')
+        plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_info["num_rois"]}')
         plt.show()
     print('----------------------------------------')
 
-    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_data, allow_pickle=True)
-    return np.load(roi_data_path, allow_pickle=True)
+    np.savez(roi_info_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_info, allow_pickle=True)
+    return np.load(roi_info_path, allow_pickle=True)

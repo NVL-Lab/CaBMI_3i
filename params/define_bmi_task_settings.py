@@ -18,12 +18,12 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dic
                 'green': {
                     'label': 'g',
                     'fp_idx': 0, # in windows its 0; last time 1
-                    'pmt_idx': 1 #0
+                    'pmt_idx': 0 #1
                 },
                 'red': {
                     'label': 'r',
                     'fp_idx': 1, #0
-                    'pmt_idx': 0 #1
+                    'pmt_idx': 1 #0 check
                 }
             }
         },

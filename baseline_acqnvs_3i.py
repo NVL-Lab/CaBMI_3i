@@ -51,14 +51,14 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, channel, plot=Fal
 
     # Initialize baseline variables
     #'''
-    number_neurons = int(np.max(roi_mask))
+    number_neurons = int(np.max(roi_mask)) # wrong because the labels are for all neurons
     strc_mask = obtain_strc_mask_from_mask(roi_mask) # mask should not include non-cells
     base_activity = np.full((number_neurons, expected_length), np.nan)
     print(base_activity.shape)
     #'''
     #base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
 
-    base_activity = recording_acqnvs_3i(base_activity, expected_length, task_set, sb_file_reader, bdata_path, capture, channel, {'type': 'baseline', 'mask': strc_mask})
+    base_activity = recording_acqnvs_3i(base_activity, expected_length, task_set, sb_file_reader, bdata_path, capture, channel, {'type': 'baseline', 'strc_mask': strc_mask})
 
     print('Finished baseline acquisition')
     play_tone(7000, 1)

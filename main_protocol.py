@@ -52,7 +52,7 @@ if __name__ == '__main__':
     '''
     # Check task_set['im']['chan_data']['green'].
     roi_bg = get_roi_bg(task_set, path_data, 0, 'red', False)
-    roi_info = get_roi_data(roi_bg, path_data, [{}], task_set['im']['chan_data']['red'], False, True)
+    roi_info = get_roi_data(roi_bg, path_data, [{}], task_set['im']['chan_data']['red'], True, True)
     # Example of extracting info from another channel and appending it to roi_info['chan']
     #roi_raw_data = get_roi_data(roi_bg, path_data, roi_info['roi_data'].item()['chan'], task_set['im']['chan_data']['green'], False, True)
 

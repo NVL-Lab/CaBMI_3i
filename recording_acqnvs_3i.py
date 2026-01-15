@@ -53,7 +53,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
 
                 if expt_info['type'] == 'baseline':
                     # Store ROI data
-                    unit_vals = get_roi(image, expt_info['mask'])
+                    unit_vals = get_roi(image, expt_info['strc_mask'])
                     print(len(unit_vals))
                     image_data[:, frame_counter] = unit_vals
                 else:

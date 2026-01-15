@@ -19,10 +19,10 @@ def create_roi_mask(image, stat, iscell):
             #cell_count += 1
             #roi_mask[roi['ypix'], roi['xpix']] += cell_count
             # Intensities: roi['lam']
-            roi_mask[roi['ypix'], roi['xpix']] = i + roi['lam']
+            roi_mask[roi['ypix'], roi['xpix']] = i #+ roi['lam']
         else:
             #false_cell_count += 1
-            roi_mask_false[roi['ypix'], roi['xpix']] = i + roi['lam']#j
+            roi_mask_false[roi['ypix'], roi['xpix']] = i #+ roi['lam']#j
 
     fig, axes = plt.subplots(1, 2)
     axes[0].imshow(image[0], cmap='bone')

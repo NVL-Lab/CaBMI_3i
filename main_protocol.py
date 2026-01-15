@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from params.play_tone import play_tone
 
-from roi_acqnvs_3i import roi_acqnvs_3i
+from roi_acqnvs_3i import get_roi_bg, get_roi_data
 from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
@@ -51,19 +51,22 @@ if __name__ == '__main__':
             Capture the image and input the capture index
     '''
     # Check task_set['im']['chan_data']['green'].
-    _, roi_info = roi_acqnvs_3i(task_set, path_data, 0, 'red', [{}], True, True)
+    roi_bg = get_roi_bg(task_set, path_data, 0, 'red', False)
+    roi_info = get_roi_data(roi_bg, path_data, [{}], task_set['im']['chan_data']['red'], False, True)
     # Example of extracting info from another channel and appending it to roi_info['chan']
-    #roi_info = roi_acqnvs_3i(task_set, path_data, 1, 'green', roi_info['roi_data'].item()['chan'], True, True)
-    exit()
+    #roi_raw_data = get_roi_data(roi_bg, path_data, roi_info['roi_data'].item()['chan'], task_set['im']['chan_data']['green'], False, True)
+
     '''
         Baseline Acquisition
     '''
-    #roi_data = roi_info['roi_data'].item()
+    roi_data = roi_info['roi_data'].item()
+    #print(roi_data)
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, [], 4,True, True)
+    #bdata = baseline_acqnvs_3i(task_set, path_data, [], 4,True, True) # for TESTING
+    #exit()
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 0, 'red',True, True )
     exit()
-    #bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 1, True, True)
 
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found

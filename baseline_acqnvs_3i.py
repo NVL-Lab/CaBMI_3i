@@ -8,6 +8,9 @@ from wait_on_task_3i import wait_for_reader_with_capture
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
 from params.play_tone import play_tone
+from recording_acqnvs_3i import recording_acqnvs_3i
+
+from pathlib import Path
 
 @contextmanager
 def on_cleanup(bdata_path, base_activity):
@@ -18,10 +21,14 @@ def on_cleanup(bdata_path, base_activity):
     finally:
         print('Cleaning...')
         # consider storing everything under an npz
-        np.save(bdata_path, base_activity, allow_pickle=True)
+        #np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=False) -> np.array:
+def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, channel, plot=False, run=False) -> np.array:
+
+    # Save path
     bname = 'baseline_online'
+    bdata_path = path_data['save_path'] / f'{bname}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
+
     if not run:
         try:
             matches = [path for path in path_data['save_path'].rglob('*') if bname in path.name]
@@ -32,33 +39,32 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
             exit(1)
 
-    # Save path
-    bdata_path = path_data['save_path'] / f'{bname}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
-
     # Creates an instance of slidebook reader
     sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
 
-    '''
-    while sb_file_reader.GetNumCaptures() < capture+1:
-        capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
-        sb_file_reader = wait_for_reader(path_data['sldy_path'])
-        #sb_file_reader.Refresh(capture)
-    '''
-
-    save_path_expt = path_data['save_path'] / 'im' / 'baseline'
-    save_path_expt.mkdir(parents=True, exist_ok=True)
+    #save_path_expt = path_data['save_path'] / 'im' / 'baseline'
+    #save_path_expt.mkdir(parents=True, exist_ok=True)
 
     dilation_factor = 1 # 2
-    expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
+    #expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
+    expected_length = 1130
 
     # Initialize baseline variables
     #'''
     number_neurons = int(np.max(roi_mask))
-    strc_mask = obtain_strc_mask_from_mask(roi_mask)
+    strc_mask = obtain_strc_mask_from_mask(roi_mask) # mask should not include non-cells
     base_activity = np.full((number_neurons, expected_length), np.nan)
+    print(base_activity.shape)
     #'''
     #base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
 
+    base_activity = recording_acqnvs_3i(base_activity, expected_length, task_set, sb_file_reader, bdata_path, capture, channel, {'type': 'baseline', 'mask': strc_mask})
+
+    print('Finished baseline acquisition')
+    play_tone(7000, 1)
+    return base_activity
+
+    '''
     frame_counter = 0
     time_point_count = sb_file_reader.GetNumTimepoints(capture)
     #time_point_count = 8925
@@ -96,7 +102,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
 
             print(f'*** Time Point: {curr_time_point}')
-            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point-1, z_plane, task_set['im']['chan_data']['green']['pmt_idx'], True)  # recording is different index
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point-1, z_plane, task_set['im']['chan_data'][channel]['pmt_idx'], True)  # recording is different index
 
             # check desired amount of frames start perhaps start recording past 50
             if curr_time_point != temp_time_point:
@@ -111,7 +117,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                 base_activity[:, frame_counter] = unit_vals
 
                 #base_activity[frame_counter] = image # FOR TESTING
-                #frame_counter += 1
+                frame_counter += 1
                 counter_same = 0
 
                 elapsed_time = time.perf_counter() - start_time
@@ -121,9 +127,9 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
                     time.sleep(frame_interval - elapsed_time)
             else:
                 counter_same += 1
-
-
-        '''
+        
+        
+        # Older version
         for time_point in range(0, 250):
             #for time_point in range(init_time_point, time_point_count):
 
@@ -186,15 +192,8 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, plot=False, run=F
             # If refreshing was halted, acquisition stops entirely
         if read_break:
             break
-            
-        '''
 
-        '''
         # Loop again
         init_time_point = time_point_count
         time_point_count = sb_file_reader.GetNumTimepoints(capture)
-        '''
-
-    print('Finished baseline acquisition')
-    play_tone(7000, 1)
-    return base_activity
+    '''

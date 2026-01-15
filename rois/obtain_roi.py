@@ -24,6 +24,8 @@ def get_roi(im, strc_mask, units=None):
     # Default: all units
     if units is None:
         units = range(len(strc_mask['neuron_mask']))
+    print(len(units))
+    # problem may reside here
 
     unit_vals = np.zeros(len(units))
 

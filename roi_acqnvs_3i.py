@@ -1,26 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from contextlib import contextmanager
-import time
 
-from wait_on_task_3i import wait_for_reader_with_capture
+from wait_on_task_3i import wait_for_reader_with_capture, wait_for_reader
 from rois.scale_im_interactive import scale_im_interactive
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.obtain_roi_mask_suite2p import get_roi_mask
+from recording_acqnvs_3i import recording_acqnvs_3i
 
-@contextmanager
-def on_cleanup(roi_data_path, roi_activity):
-    try:
-        yield
-    except KeyboardInterrupt:
-        print('Keyboard Interrupt')
-    finally:
-        print('Cleaning...')
-        # consider storing everything under an npz
-        # ROI recording will be save in npy, while the rest will be npz
-        #np.save(roi_data_path, roi_activity, allow_pickle=True)
+from pathlib import Path
 
-def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_data_flag=False, run=False) -> np.array:
+def get_roi_bg(task_set, path_data, capture, channel, run=False) -> np.array:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -36,68 +25,39 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
         Returns:
             test_info: dictionary containing dataframes with voltage data.
     """
-    roi_data_path = path_data['save_path'] / 'roi_data.npy'
-    roi_info_path = path_data['save_path'] / 'roi_info.npz'
+    #roi_bg_path = path_data['save_path'] / f'roi_bg_{channel}.npy'
+    roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
 
     # Checks if ROI file already exists
     if not run:
         try:
-            roi_data = np.load(roi_data_path, allow_pickle=True)
-            roi_info = np.load(roi_info_path, allow_pickle=True)
-            print(f'Loading {roi_data_path.name} and {roi_info_path.name}')
-            return roi_data, roi_info
+            roi_bg = np.load(roi_bg_path, allow_pickle=True)
+            print(f'Loading {roi_bg_path.name}')
+            return roi_bg
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
 
     # Creates an instance of slidebook reader
     sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
-    '''
-    while sb_file_reader.GetNumCaptures() < capture + 1:
-        capture = int(input('Did you start the desired capture? If not, enter new capture number and press enter: '))
-        sb_file_reader = wait_for_reader(path_data['sldy_path'])
-    '''
 
-    chan_data = task_set['im']['chan_data'][channel]
+    # minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved - 1130
+    minute_recording_len = 1130 # 1160 in actual record
+    roi_bg = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
-    #minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
-    minute_recording_len = 1130
-    image_data = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
-    frame_counter = 0
-    counter_same = 0
-    temp_time_point = 0
-    frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
-    plane_count = sb_file_reader.GetNumZPlanes(capture)
-    z_plane = int(plane_count / 2)
-    loop_duration_sec = 0
-    with on_cleanup(roi_data_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
-        while counter_same < 1000:
-            # Stops recording when buffer is full
-            if frame_counter >= minute_recording_len:
-                break
-            sb_file_reader.Refresh(capture)
-            curr_time_point = sb_file_reader.GetNumTimepoints(capture)
-            print(f'*** Time Point: {curr_time_point}')
-            # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                     chan_data['pmt_idx'],
-                                                     True)
-            if curr_time_point != temp_time_point:
-                temp_time_point = curr_time_point
-                start_time = time.perf_counter()
+    return recording_acqnvs_3i(roi_bg, minute_recording_len, task_set, sb_file_reader, roi_bg_path, capture, channel, {'type': 'default'})
 
-                image_data[frame_counter] = image
-                frame_counter += 1
-                counter_same = 0
-
-                elapsed_time = time.perf_counter() - start_time
-                loop_duration_sec = loop_duration_sec + elapsed_time
-                print(f'Execution time: {elapsed_time} seconds')
-
-                if elapsed_time < frame_interval:
-                    time.sleep(frame_interval - elapsed_time)
-            else:
-                counter_same += 1
+def get_roi_data(image_data, path_data, roi_chan_data, chan_data, see_roi_data_flag=False, run=False) -> np.array:
+    roi_data_path = path_data['save_path'] / 'roi_data.npz'
+    # Checks if ROI file already exists
+    if not run:
+        try:
+            roi_data = np.load(roi_data_path, allow_pickle=True)
+            print(f'Loading {roi_data_path.name}')
+            return roi_data
+        except FileNotFoundError:
+            print('ROI data not found. Please run roi_acqnvs_3i')
+            exit(1)
 
     # Check suite2p's way of creating the mean image and use that method.
     #image_data = np.load('F:cabmi/bmi_test/slidebook/capture_slide.dir/Streamtodisk-1765822852-121.imgdir/ImageData_Ch0_TP0000000.npy')
@@ -145,5 +105,5 @@ def roi_acqnvs_3i(task_set, path_data, capture, channel, roi_chan_data, see_roi_
         plt.show()
     print('----------------------------------------')
 
-    np.savez(roi_info_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_info, allow_pickle=True)
-    return np.load(roi_info_path, allow_pickle=True)
+    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_info, allow_pickle=True)
+    return np.load(roi_data_path, allow_pickle=True)

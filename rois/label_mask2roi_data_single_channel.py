@@ -39,7 +39,7 @@ def label_mask2roi_data_single_channel(im_bg, label_mask, temp_data, chan_label)
     roi_data['im_roi_rg'] = im_roi_rg
 
     roi_data['channel'] = temp_data
-    chan_idx = len(temp_data)
+    chan_idx = len(temp_data)-1
     roi_data['channel'][chan_idx]['label'] = chan_label
     roi_data['channel'][chan_idx]['num_rois'] = roi_data['num_rois']
     roi_data['channel'][chan_idx]['idxs'] = list(range(1, roi_data['num_rois'] + 1))

@@ -51,7 +51,7 @@ if __name__ == '__main__':
             Capture the image and input the capture index
     '''
     # Check task_set['im']['chan_data']['green'].
-    roi_bg = get_roi_bg(task_set, path_data, 0, 'red', False)
+    roi_bg = get_roi_bg(task_set, path_data, 4, 'red', True) # channel's not static for pmt. whichever is written first is channel 0
     roi_info = get_roi_data(roi_bg, path_data, [{}], task_set['im']['chan_data']['red'], True, True)
     # Example of extracting info from another channel and appending it to roi_info['chan']
     #roi_raw_data = get_roi_data(roi_bg, path_data, roi_info['roi_data'].item()['chan'], task_set['im']['chan_data']['green'], False, True)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
     # there will be n (number of ROIs) arrays, within each array
     #bdata = baseline_acqnvs_3i(task_set, path_data, [], 4,True, True) # for TESTING
     #exit()
-    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 0, 'red',True, True )
-    exit()
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], 5, 'red',True, True)
+    #exit()
 
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     plt.show()
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_data = bmi_acqnvs_3i(task_set, path_data, 2, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
+    bmi_data = bmi_acqnvs_3i(task_set, path_data, 3, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
                              0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, False, True)
 
     # If motor behavior experiment, run this
-    check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)
+    check_motor_behavior(task_set, path_data, 4, exp_info['expt'], False, False)

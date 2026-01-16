@@ -34,7 +34,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
-    loop_duration_sec = 0
+    #loop_duration_sec = 0
     with on_cleanup(image_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
         while counter_same < 1000:
             # Stops recording when buffer is full
@@ -63,7 +63,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
                 counter_same = 0
 
                 elapsed_time = time.perf_counter() - start_time
-                loop_duration_sec = loop_duration_sec + elapsed_time
+                #loop_duration_sec = loop_duration_sec + elapsed_time
                 print(f'Execution time: {elapsed_time} seconds')
 
                 if elapsed_time < frame_interval:

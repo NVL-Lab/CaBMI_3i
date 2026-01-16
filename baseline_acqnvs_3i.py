@@ -34,6 +34,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, channel, plot=Fal
             matches = [path for path in path_data['save_path'].rglob('*') if bname in path.name]
             bdata = np.load(matches[-1], allow_pickle=True)
             print(f'Loading {matches[-1].name}')
+            #bdata = np.load('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy', allow_pickle=True)
             return bdata
         except FileNotFoundError:
             print('Baseline data not found. Please run baseline_acqnvs_3i.')

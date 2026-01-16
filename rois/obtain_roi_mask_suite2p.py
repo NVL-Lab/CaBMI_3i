@@ -12,26 +12,38 @@ def create_roi_mask(image, stat, iscell):
 
     cell_indexes = np.where(iscell[:, 0] == 1)[0].tolist()
     false_cell_indexes = np.where(iscell[:, 0] == 0)[0].tolist()
+    cell_count = len(cell_indexes)
+    false_cell_count =  len(false_cell_indexes)
 
+    j=1
+    for i in cell_indexes:
+        roi_mask[stat[i]['ypix'], stat[i]['xpix']] = j# + stat[i]['lam']
+        j=j+1
+    j=1
+    for i in false_cell_indexes:
+        roi_mask_false[stat[i]['ypix'], stat[i]['xpix']] = j# + stat[i]['lam']
+        j=j+1
+
+    '''
     for i, roi in enumerate(stat): # Check stat, see how it is shaped
-        #j = i+1
         if i in cell_indexes: #if iscell[i, 0]:
             #cell_count += 1
             #roi_mask[roi['ypix'], roi['xpix']] += cell_count
             # Intensities: roi['lam']
-            roi_mask[roi['ypix'], roi['xpix']] = i #+ roi['lam']
+            roi_mask[roi['ypix'], roi['xpix']] = i + roi['lam']
         else:
             #false_cell_count += 1
-            roi_mask_false[roi['ypix'], roi['xpix']] = i #+ roi['lam']#j
+            roi_mask_false[roi['ypix'], roi['xpix']] = i + roi['lam']#j
+    '''
 
     fig, axes = plt.subplots(1, 2)
     axes[0].imshow(image[0], cmap='bone')
     cells = axes[0].imshow(roi_mask, cmap='nipy_spectral', alpha=0.7)
-    axes[0].set_title(f'ROI Mask: {len(cell_indexes)} Neurons')
+    axes[0].set_title(f'ROI Mask: {cell_count} Neurons')
     fig.colorbar(cells, ax=axes[0], label="ROI Label Index")
     axes[1].imshow(image[0], cmap='bone')
     false_cells = axes[1].imshow(roi_mask_false, cmap='nipy_spectral', alpha=0.7)
-    axes[1].set_title(f'{len(false_cell_indexes)} ROIs are not cells')
+    axes[1].set_title(f'{false_cell_count} ROIs are not cells')
     fig.colorbar(false_cells, ax=axes[1], label="ROI Label Index")
 
     plt.show()
@@ -47,7 +59,7 @@ def create_roi_mask(image, stat, iscell):
     plt.close()
     '''
 
-    return roi_mask
+    return roi_mask#, cell_count, false_cell_count
 
 def get_roi_mask(image, save_path):
     image = np.array([image]) # suite2p expects several frames (Lx, Ly, Lz)

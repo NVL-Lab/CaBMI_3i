@@ -3,8 +3,8 @@
 def get_exp_info() -> dict:
     return {
         # Actual directories
-        'save_base_dir': 'F:cabmi_rg_pmts/bmi_test',
-        'sldy_dir': 'F:cabmi_rg_pmts/bmi_test/slidebook',
+        'save_base_dir': 'F:cabmi/bmi_test',
+        'sldy_dir': 'F:cabmi/bmi_test/slidebook',
         'sldy_name': 'capture_slide.sldy',
 
         # Windows Testing

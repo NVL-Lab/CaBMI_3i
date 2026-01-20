@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from contextlib import contextmanager
 
-from wait_on_task_3i import wait_for_reader_with_capture
+from wait_on_task_3i import *
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
 from params.play_tone import play_tone
@@ -23,7 +23,7 @@ def on_cleanup(bdata_path, base_activity):
         # consider storing everything under an npz
         #np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, channel, plot=False, run=False) -> np.array:
+def baseline_acqnvs_3i(task_set, path_data, roi_mask, plot=False, default_run=False, run=False) -> np.array:
 
     # Save path
     bname = 'baseline_online'
@@ -41,25 +41,28 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, capture, channel, plot=Fal
             exit(1)
 
     # Creates an instance of slidebook reader
-    sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
+    #task_set['cb']['baseline_capture'] = 0
+    #sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], task_set['roi']['capture'])
+    sb_file_reader, task_set['cb']['baseline_capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
+    task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
 
     #save_path_expt = path_data['save_path'] / 'im' / 'baseline'
     #save_path_expt.mkdir(parents=True, exist_ok=True)
 
-    dilation_factor = 1 # 2
+    #dilation_factor = 1 # 2
     #expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
-    expected_length = 1130
+    task_set['cb']['baseline_frames'] = 1100
 
     # Initialize baseline variables
     #'''
     number_neurons = int(np.max(roi_mask)) # wrong because the labels are for all neurons
     strc_mask = obtain_strc_mask_from_mask(roi_mask) # mask should not include non-cells
-    base_activity = np.full((number_neurons, expected_length), np.nan)
+    base_activity = np.full((number_neurons, task_set['cb']['baseline_frames']), np.nan)
     print(base_activity.shape)
     #'''
     #base_activity = np.full((250, 390, 403), np.nan) # FOR TESTING
 
-    base_activity = recording_acqnvs_3i(base_activity, expected_length, task_set, sb_file_reader, bdata_path, capture, channel, {'type': 'baseline', 'strc_mask': strc_mask})
+    base_activity = recording_acqnvs_3i(base_activity, task_set['cb']['baseline_frames'], task_set, sb_file_reader, bdata_path, task_set['cb']['baseline_capture'], {'type': 'baseline', 'strc_mask': strc_mask})
 
     print('Finished baseline acquisition')
     play_tone(7000, 1)

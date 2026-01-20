@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from wait_on_task_3i import wait_for_reader_with_capture, wait_for_reader
+from wait_on_task_3i import *
 from rois.scale_im_interactive import scale_im_interactive
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.obtain_roi_mask_suite2p import get_roi_mask
@@ -9,7 +9,7 @@ from recording_acqnvs_3i import recording_acqnvs_3i
 
 from pathlib import Path
 
-def get_roi_bg(task_set, path_data, capture, channel, run=False) -> np.array:
+def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.array:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -39,15 +39,18 @@ def get_roi_bg(task_set, path_data, capture, channel, run=False) -> np.array:
             exit(1)
 
     # Creates an instance of slidebook reader
-    sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
+    #task_set['roi']['capture'] = 0
+    #sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'],task_set['roi']['capture'])
+    sb_file_reader, task_set['roi']['capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
+    task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
 
-    # minute_recording_len = int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved - 1130
-    minute_recording_len = 1130 # 1160 in actual record
-    roi_bg = np.full((minute_recording_len, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+    # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
+    task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
+    roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
-    return recording_acqnvs_3i(roi_bg, minute_recording_len, task_set, sb_file_reader, roi_bg_path, capture, channel, {'type': 'default'})
+    return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
-def get_roi_data(image_data, path_data, roi_chan_data, chan_data, see_roi_data_flag=False, run=False) -> np.array:
+def get_roi_data(image_data, path_data, task_set, see_roi_data_flag=False, run=False) -> np.array:
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
     # Checks if ROI file already exists
     if not run:
@@ -90,7 +93,8 @@ def get_roi_data(image_data, path_data, roi_chan_data, chan_data, see_roi_data_f
     print('Obtaining ROI mask!')
     print('----------------------------------------')
     roi_mask = get_roi_mask(im_bg, path_data['save_path'])
-    roi_info = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, chan_data['label'])
+    roi_chan_data = [{}]
+    roi_info = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, task_set['im']['chan_data']['recording_chan'])
 
     # See ROI if needed
     if see_roi_data_flag:

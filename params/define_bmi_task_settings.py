@@ -2,7 +2,7 @@ from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dict:
+def get_bmi_settings(fr: float = 38.6) -> Dict:
     #fr = 29.752 # Prairie
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
@@ -10,26 +10,16 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dic
 
         # Imaging
         'im': {
-            'resolution': res,
+            #'resolution': res, # res: Tuple[int, int] = (403, 390)
             'frame_rate': fr,
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
-            'chan_data': {
-                'green': {
-                    'label': 'g',
-                    'fp_idx': 0, # in windows its 0; last time 1
-                    'pmt_idx': 0 #1
-                },
-                'red': {
-                    'label': 'r',
-                    'fp_idx': 1, #0
-                    'pmt_idx': 1 #0 check
-                }
-            }
+            'chan_data': {}
         },
 
         # Regions of Interest (ROIs)
         'roi': {
+            'recording_len': 60,  # sec
             'template_diam': 3,  # Diameter of difference of Gaussians in pixels
             'thres': 0.5,        # Cell detection threshold as correlation coefficient
             'cell_diam': 17,     # CELL_DIAM is diameter used for dilation.
@@ -69,3 +59,25 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dic
         'delay_flag': 0,
         'delay_time': 1  # Seconds 
     }
+
+'''
+        # Imaging
+        'im': {
+            'resolution': res,
+            'frame_rate': fr,
+            'zoom': 1.5,          # Zoom to obtain cells
+            'posz': 0,            # Position of Z if known
+            'chan_data': {
+                'green': {
+                    'label': 'g',
+                    'fp_idx': 0#, # in windows its 0; last time 1
+                    #'pmt_idx': 1 #0 if capture with red # ChannelRecord.yaml has info about PMT type but only comes after start
+                },
+                'red': {
+                    'label': 'r',
+                    'fp_idx': 1#, #0
+                    #'pmt_idx': 0
+                }
+            }
+        },
+'''

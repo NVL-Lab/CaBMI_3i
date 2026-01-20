@@ -14,7 +14,7 @@ def on_cleanup(image_path, image_data):
         print('Cleaning...')
         #np.save(image_path, image_data, allow_pickle=True)
 
-def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, channel, expt_info) -> np.array:
+def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info) -> np.array:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -27,7 +27,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
         Returns:
             test_info: dictionary containing dataframes with voltage data.
     """
-    #image_data = np.full((frame_limit, task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+    channel = task_set['im']['chan_data']['recording_chan']
     frame_counter = 0
     counter_same = 0
     temp_time_point = 0
@@ -45,8 +45,13 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
             print(f'*** Time Point: {curr_time_point}')
             # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
             image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
+                                                     task_set['im']['chan_data'][channel],
+                                                     True)
+            '''
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
                                                      task_set['im']['chan_data'][channel]['pmt_idx'],
                                                      True)
+            '''
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
                 start_time = time.perf_counter()
@@ -73,3 +78,5 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
     return image_data
 
 # create a function that will go through each frame like recording
+def recording_retrieval_3i():
+    return 'not done'

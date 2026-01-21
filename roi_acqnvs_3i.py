@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 
 from wait_on_task_3i import *
@@ -9,7 +8,7 @@ from recording_acqnvs_3i import recording_acqnvs_3i
 
 from pathlib import Path
 
-def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.array:
+def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -25,14 +24,13 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.array:
         Returns:
             test_info: dictionary containing dataframes with voltage data.
     """
-    #roi_bg_path = path_data['save_path'] / f'roi_bg_{channel}.npy'
-    roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
-
-    # Checks if ROI file already exists
+    base_name = 'roi_bg'
     if not run:
         try:
-            roi_bg = np.load(roi_bg_path, allow_pickle=True)
-            print(f'Loading {roi_bg_path.name}')
+            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+            roi_bg = np.load(matches[-1], allow_pickle=True)
+            print(f'Loading {matches[-1].name}')
+            # roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
             return roi_bg
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
@@ -43,6 +41,7 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.array:
     #sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'],task_set['roi']['capture'])
     sb_file_reader, task_set['roi']['capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
     task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
+    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set['im']['chan_data']['recording_chan'].lower().replace(" ", "")}.npy'
 
     # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
     task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
@@ -50,7 +49,7 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.array:
 
     return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
-def get_roi_data(image_data, path_data, task_set, see_roi_data_flag=False, run=False) -> np.array:
+def get_roi_data(image_data, path_data, task_set, plot=False, run=False) -> np.array:
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
     # Checks if ROI file already exists
     if not run:
@@ -97,7 +96,7 @@ def get_roi_data(image_data, path_data, task_set, see_roi_data_flag=False, run=F
     roi_info = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, task_set['im']['chan_data']['recording_chan'])
 
     # See ROI if needed
-    if see_roi_data_flag:
+    if plot:
         plt.figure()
         plt.imshow(roi_info['roi_mask'], cmap='gray')
         plt.title(f'ROI Mask. Num Roi: {roi_info["num_rois"]}')

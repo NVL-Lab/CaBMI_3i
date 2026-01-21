@@ -59,7 +59,7 @@ if __name__ == '__main__':
     roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'],True, True, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], True, True)
 
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found
@@ -89,6 +89,7 @@ if __name__ == '__main__':
     '''
         BMI Acquisition
     '''
+    motor_run = False
     # Test Feedback (FB)
     if fb_set['fb_bool']:
         print('Testing Feedback...')
@@ -102,8 +103,8 @@ if __name__ == '__main__':
     plt.show()
 
     # Define the type of experiment and run the BMI acquisition
-    bmi_data = bmi_acqnvs_3i(task_set, path_data, 2, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
-                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, False, True)
+    bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
+                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, True, True)
 
-    # If motor behavior experiment, run this
-    check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)
+    if motor_run:
+        check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

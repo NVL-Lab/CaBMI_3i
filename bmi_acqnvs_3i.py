@@ -1,11 +1,8 @@
-import matplotlib.pyplot as plt
 from datetime import datetime
 from contextlib import contextmanager
-import numpy as np
-import time
 from typing import Optional
 
-from wait_on_task_3i import wait_for_reader_with_capture
+from wait_on_task_3i import *
 from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio
@@ -20,12 +17,13 @@ def on_cleanup(save_path, data, bdata):
         print('Cleaning...')
         np.savez(save_path, data=data, bdata=bdata)
 
-def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None, plot=False, run=False) -> np.ndarray:
+def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None, default_run=False, run=False) -> np.ndarray:
     # base_val_seed are values to add to "initialize the baseline" instead of starting with ones or nans.
-    bname = 'bmi_online'
+    # Save path
+    base_name = 'bmi_online'
     if not run:
         try:
-            matches = [path for path in path_data['save_path'].rglob('*') if bname in path.name]
+            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
             bdata = np.load(matches[-1], allow_pickle=True)
             print(f'Loading {matches[-1].name}')
             return bdata
@@ -33,19 +31,20 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
             exit(1)
 
-    # Save path
-    bmi_data_path = path_data['save_path'] / f'bmi_online_{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
     # Creates an instance of slidebook reader
-    sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'], capture)
+    sb_file_reader, capture = wait_for_reader_with_latest_capture(path_data['sldy_path'])
+    task_set = get_recording_settings(sb_file_reader, capture, task_set, default_run)
+    bmi_data_path = path_data['save_path'] / f'{base_name}_{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
+    task_set['capture'] = capture
 
     # Load flag configuration file
     flags = get_flags()[expt_str]
 
     # Values of parameters in frames
-    expected_expt_length = int(np.ceil(tset['bmi_len']*tset['im']['frame_rate'])) # in frames
-    relaxation_frames = round(tset['relaxation_time']*tset['im']['frame_rate'])
-    
-    #bdata = np.load(baseline_calib_file, allow_pickle=True)
+    #expected_expt_length = int(np.ceil(task_set['bmi_len'] * task_set['im']['frame_rate'])) # in frames
+    expected_expt_length = 1100
+    relaxation_frames = round(task_set['relaxation_time'] * task_set['im']['frame_rate'])
+
     back2base = 1/2*bdata['t1']
 
     # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
@@ -55,7 +54,7 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
     number_neurons = len(bdata['e_id'])
 
     # Pre-allocating arrays
-    fbuffer = np.full((number_neurons, tset['dff_win']), np.nan, dtype=np.float64)
+    fbuffer = np.full((number_neurons, task_set['dff_win']), np.nan, dtype=np.float64)
 
     data = {
         'self_hits'     : np.zeros(expected_expt_length, dtype=np.float64),
@@ -98,8 +97,9 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
     trial_flag = True #1
     # TODO: decide the non_buffer_update_counter is worth keeping or not. Don't keep it at 0
     # Nuria explanation: this buffer was to "drop" the first images to avoid artifacts
+    # Me: Could be worth dropping
     #: TODO: Nuria changed the following to remove the 0 back to the tset value
-    non_buffer_update_counter = tset['prefix_win']  # Counter when we don't want to update the buffer
+    non_buffer_update_counter = task_set['prefix_win']  # Counter when we don't want to update the buffer
     # TODO: Nuria changed this back from the 0 back to the value of the non-buffer-update
     init_frame_base = non_buffer_update_counter + 1
     # Beginning of experiment and VTA stim
@@ -111,93 +111,61 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
     back2base_counter = 0
     back2baseline_flag = False #0
 
-    data['frame'] = 0 #1
     base_buffer_full = False
 
+    channel = task_set['im']['chan_data']['recording_chan']
+    data['frame'] = 0 #1
     counter_same = 0
-    frames_captured = 0
     temp_time_point = 0
-    frame_interval = 1 / (tset['im']['frame_rate'] * 1.2)
+    frame_interval = 1 / (task_set['im']['frame_rate'] * 1.2)
+    plane_count = sb_file_reader.GetNumZPlanes(capture)
+    z_plane = int(plane_count / 2)
 
+    if not debug_bool:
+        # save_files_3i(path_data['save_path'], pl = None, expt_str)
+        save_path_expt = path_data['save_path'] / 'im' / expt_str
+        save_path_expt.mkdir(parents=True, exist_ok=True)
+        strc_mask = np.load(path_data['save_path'] / 'strc_mask.npz', allow_pickle=True)['strc_mask'].item()
+
+    # Give random reward to trigger the jetball
+    '''
+    a.write_digital("D9", 1)
+    time.sleep(1)
+    a.write_digital("D9", 0)
+    '''
+
+    print('STARTING RECORDING!!!')
+    print('baseBuffer filling!...')
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bmi_data_path, data, bdata):
-        if not debug_bool:
-            # save_files_3i(path_data['save_path'], pl = None, expt_str)
-            save_path_expt = path_data['save_path'] / 'im' / expt_str
-            save_path_expt.mkdir(parents=True, exist_ok=True)
-            strc_mask = np.load(path_data['save_path'] / 'strc_mask.npz', allow_pickle=True)['strc_mask'].item()
-
-        # Give random reward to trigger the jetball
-        '''
-        a.write_digital("D9", 1)
-        time.sleep(1)
-        a.write_digital("D9", 0)
-        '''
-
-        init_time_point = 0
-        #init_time_point = 8925
-        sleep_time = 0.001  # 10 ms (consider no sleep)
-        #capture = sb_file_reader.GetNumCaptures() - 1 # 2 - This capture should be the third within the slide
-        time_point_count = sb_file_reader.GetNumTimepoints(capture)
-        #time_point_count = 26778 # 18077 actual frames difference
-        plane_count = sb_file_reader.GetNumZPlanes(capture)
-        z_plane = int(plane_count/2)
-
-        # TODO: change this to the current time when the record starts and the buffer fills
-        print('STARTING RECORDING!!!')
-        print('baseBuffer filling!...')
-        read_break = False
-
-        if plot:
-            fig = plt.figure(0)
-            title = 'Timepoint: {tp:6d}'
-
         while counter_same < 1000 and data['frame'] < expected_expt_length:
-            # TODO: you want to be current on time, regardless of how many frames you "may" lose. But you want to know that you lost frames.
-            # TODO: the reason is to avoid lags that can accumulate to the point that the animal is getting feedback that is seconds late.
             if debug_bool and data['frame'] > debug_input.shape[1]:  # debug_input.shape[1] or maybe len if 1D list
                 break
 
             sb_file_reader.Refresh(capture)  # Takes ~4ms
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
+
+            print(f'*** Time Point: {curr_time_point}')
             if not debug_bool:
+                # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
                 image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                         tset['im']['chan_data']['chan_idx'], True)
+                                                         task_set['im']['chan_data'][channel],
+                                                         True)
                 # image = path_data['test_data'][time_point]
                 if image.shape[0] == 0:
                     break
 
-            print(f'*** Time Point: {curr_time_point}')
-
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
-                frames_captured += 1
-                print(f'*** Frames captured: {frames_captured}')
+                print(f'*** Frames captured: {data['frame']+1}')
                 start_time = time.perf_counter()
-
-                # TODO: nuria removed it because you don't want to waste time plotting
-                # if not debug_bool and plot:
-                #     if time_point == 0:
-                #         img_artist = plt.imshow(image)
-                #     elif time_point % 2 == 0:
-                #         img_artist.set_data(image)
-                #         plt.draw()
-                #         fig.canvas.flush_events()
-                #         plt.title(title.format(tp=time_point), loc='left')
-                #         try:
-                #             plt.pause(0.01)
-                #         except KeyboardInterrupt:
-                #             print("Keyboard Interrupt")
-                #             exit()
 
                 if non_buffer_update_counter == 0:
                     print('Extracting ROI Mask...')
                     if not debug_bool:
-                        unit_vals = get_roi(image, strc_mask)  # Function to obtain Rois values
+                        unit_vals = get_roi(image, strc_mask)  # obtain roi values
                     else:
                         unit_vals = debug_input[:, data['frame']]
-                    # TODO: be careful that "frame" is the same as timepoint for you, since you are retrieving the data
-                    # TODO: directly from the saved microscope data.
                     data['bmi_act'][:, data['frame']] = unit_vals
 
                     fbuffer[:, :-1] = fbuffer[:, 1:]
@@ -210,15 +178,15 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                             base_val = base_val_seed
                             print('baseBuffer seeded!')
                         else:
-                            base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / tset['f0_win']
-                    elif not base_buffer_full and data['frame'] <= (init_frame_base + tset['f0_win']):
-                        base_val += unit_vals / tset['f0_win']
-                        if data['frame'] == (init_frame_base + tset['f0_win']):
+                            base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
+                    elif not base_buffer_full and data['frame'] <= (init_frame_base + task_set['f0_win']):
+                        base_val += unit_vals / task_set['f0_win']
+                        if data['frame'] == (init_frame_base + task_set['f0_win']):
                             base_buffer_full = True
                             print('baseBuffer FULL!')
                     else:
                         print('Rolling base buffer...')
-                        base_val = (base_val * (tset['f0_win'] - 1) + unit_vals) / tset['f0_win']
+                        base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
 
                     data['base_vector'][:, data['frame']] = base_val
 
@@ -231,7 +199,7 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                     if base_buffer_full:
                         dff = (fs_smooth - base_val) / base_val
                         _, cursor_i, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool = dff2cursor_target(
-                            dff, bdata, tset['cursor_zscore_bool'])
+                            dff, bdata, task_set['cursor_zscore_bool'])
                         print(f'Cursor: {cursor_i}')
                         data['cursor'][data['frame']] = cursor_i
 
@@ -259,7 +227,7 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                             if back2baseline_flag:
                                 if data['cursor'][data['frame']] <= back2base:
                                     back2base_counter += 1
-                                if back2base_counter >= tset['back2base_frame_thresh']:
+                                if back2base_counter >= task_set['back2base_frame_thresh']:
                                     back2baseline_flag = False
                                     back2base_counter = 0
                                     print('back to baseline')
@@ -305,22 +273,29 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                     # TODO: get water delivery setup
                     if deliver_water:
                         if not debug_bool:
-                            #a.write_digital("D9", 1)
+                            play_tone(9000, 1)
+                            '''
+                            a.write_digital("D9", 1)
                             time.sleep(1)
-                            #a.write_digital("D9", 0)
+                            a.write_digital("D9", 0)
+                            '''
                         deliver_water = 0
                         print('water delivered!')
 
                     if deliver_stim:
-                        if tset['delay_flag']:
-                            time.sleep(tset['delay_time'])
+                        if task_set['delay_flag']:
+                            time.sleep(task_set['delay_time'])
                         if not debug_bool:
-                            # a.write_digital("D5", 1)
+                            play_tone(5000, 0.2)
+                            play_tone(3000, 1)
+                            '''
+                            a.write_digital("D5", 1)
                             time.sleep(0.2)
-                            # a.write_digital("D5", 0)
-                            # a.write_digital("D3", 1)
+                            a.write_digital("D5", 0)
+                            a.write_digital("D3", 1)
                             time.sleep(1)
-                            # a.write_digital("D3", 0)
+                            a.write_digital("D3", 0)
+                            '''
                         deliver_stim = 0
                         print('stim delivered!')
 
@@ -331,8 +306,8 @@ def bmi_acqnvs_3i(tset, path_data, capture, expt_str, bdata, vector_stim, debug_
                     counter_same = 0
 
                     if not debug_bool and data['time_vector'][data['frame']] < 1 / (
-                            tset['im']['frame_rate'] * 1.2):
-                        time.sleep(1 / (tset['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
+                            task_set['im']['frame_rate'] * 1.2):
+                        time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
 
             elapsed_time = time.perf_counter() - start_time
             print(f'Execution time: {elapsed_time} seconds')

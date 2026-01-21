@@ -130,7 +130,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
 
     # Process f0
     f0_win_bool = tset['cb']['f0_win_bool']
-    f0_win = tset['f0_win']
+    f0_win = int(tset['roi']['recording_frames'] / 2) #tset['f0_win'] is correct
     f0_init_slide = tset['cb']['f0_init_slide']
     
     if f0_win_bool:

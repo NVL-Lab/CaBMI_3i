@@ -2,7 +2,7 @@ from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(fr: float = 38.6) -> Dict:
+def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dict:
     #fr = 29.752 # Prairie
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
@@ -10,11 +10,13 @@ def get_bmi_settings(fr: float = 38.6) -> Dict:
 
         # Imaging
         'im': {
-            #'resolution': res, # res: Tuple[int, int] = (403, 390)
+            'resolution': res,    # Standard, but subject to change based on microscope operation
             'frame_rate': fr,
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
-            'chan_data': {}
+            'chan_data': {
+                'recording_chan': 'R PMT' # Standard, but subject to change based on microscope operation
+            }
         },
 
         # Regions of Interest (ROIs)

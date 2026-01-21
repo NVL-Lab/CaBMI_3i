@@ -27,10 +27,14 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
     base_name = 'roi_bg'
     if not run:
         try:
+            '''
             matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
             roi_bg = np.load(matches[-1], allow_pickle=True)
             print(f'Loading {matches[-1].name}')
-            # roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
+            '''
+            roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
+            roi_bg = np.load(roi_bg_path)
+            print('Retrieving ROI recording...')
             return roi_bg
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
@@ -41,7 +45,7 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
     #sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'],task_set['roi']['capture'])
     sb_file_reader, task_set['roi']['capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
     task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
-    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set['im']['chan_data']['recording_chan'].lower().replace(" ", "")}.npy'
+    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
 
     # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
     task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
@@ -49,7 +53,7 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
 
     return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
-def get_roi_data(image_data, path_data, task_set, plot=False, run=False) -> np.array:
+def get_roi_data(image_data, path_data, task_set, plot=False, run=False) -> np.ndarray:
     roi_data_path = path_data['save_path'] / 'roi_data.npz'
     # Checks if ROI file already exists
     if not run:

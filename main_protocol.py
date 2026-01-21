@@ -50,7 +50,7 @@ if __name__ == '__main__':
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    roi_bg = get_roi_bg(task_set, path_data, True, True)
+    roi_bg = get_roi_bg(task_set, path_data, True, False)
     roi_info = get_roi_data(roi_bg, path_data, task_set, True, True)
 
     '''
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     roi_data = roi_info['roi_data'].item()
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], True, True)
+    bdata = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], True, False, True)
 
     plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found

@@ -1,10 +1,11 @@
+from pathlib import Path
 from datetime import datetime
 from contextlib import contextmanager
 
 from wait_on_task_3i import *
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from params.play_tone import play_tone
-from recording_acqnvs_3i import recording_acqnvs_3i
+from recording_acqnvs_3i import recording_acqnvs_3i, baseline_acqnvs_sim_3i
 
 @contextmanager
 def on_cleanup(bdata_path, base_activity):
@@ -17,15 +18,21 @@ def on_cleanup(bdata_path, base_activity):
         # consider storing everything under an npz
         #np.save(bdata_path, base_activity, allow_pickle=True)
 
-def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=False) -> np.ndarray:
+def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=False, sim=False) -> np.ndarray:
     # Save path
     base_name = 'baseline_online'
     if not run:
         try:
-            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
-            bdata = np.load(matches[-1], allow_pickle=True)
-            print(f'Loading {matches[-1].name}')
-            #bdata = np.load('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy', allow_pickle=True)
+            if sim:
+                recording_path = Path(
+                    'F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy',
+                    allow_pickle=True)
+                bdata = baseline_acqnvs_sim_3i(roi_mask, task_set, recording_path)
+                print('Simulating baseline data...')
+            else:
+                matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+                bdata = np.load(matches[-1], allow_pickle=True)
+                print(f'Loading {matches[-1].name}...')
             return bdata
         except FileNotFoundError:
             print('Baseline data not found. Please run baseline_acqnvs_3i.')

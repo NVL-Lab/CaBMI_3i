@@ -3,6 +3,8 @@ from contextlib import contextmanager
 import time
 
 from rois.obtain_roi import get_roi
+from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
+from params.play_tone import play_tone
 
 @contextmanager
 def on_cleanup(image_path, image_data):
@@ -14,7 +16,7 @@ def on_cleanup(image_path, image_data):
         print('Cleaning...')
         #np.save(image_path, image_data, allow_pickle=True)
 
-def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info) -> np.array:
+def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info) -> np.ndarray:
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -61,7 +63,6 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
                 if expt_info['type'] == 'baseline':
                     # Store ROI data
                     unit_vals = get_roi(image, expt_info['strc_mask'])
-                    print(len(unit_vals))
                     image_data[:, frame_counter] = unit_vals
                 else:
                     # Store frame data
@@ -71,7 +72,6 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
                 print(f'*** Frames captured: {frame_counter}')
 
                 elapsed_time = time.perf_counter() - start_time
-                #loop_duration_sec = loop_duration_sec + elapsed_time
                 print(f'Execution time: {elapsed_time} seconds')
 
                 if elapsed_time < frame_interval:
@@ -80,6 +80,38 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
                 counter_same += 1
     return image_data
 
-# create a function that will go through each frame like recording
-def recording_retrieval_3i():
-    return 'not done'
+def baseline_acqnvs_sim_3i(roi_mask, task_set, baseline_path) -> np.ndarray:
+    record = np.load(baseline_path, mmap_mode='r')
+    dilation_factor = 1  # 2
+    # record_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
+    record_length = record.shape[0]
+    task_set['roi']['recording_frames'] = record_length
+    task_set['im']['resolution'] = (record.shape[2], record.shape[1])
+
+    number_neurons = int(np.max(roi_mask))
+    strc_mask = obtain_strc_mask_from_mask(roi_mask)
+    base_activity = np.full((number_neurons, record_length), np.nan)
+    frame_counter = 0
+    frame_interval = 1 / (task_set['im']['frame_rate'] * 1.2)
+
+    print('STARTING RETRIEVAL!!!')
+    print('Retrieving...')
+    for frame in range(record_length):
+        image = record[frame]
+        start_time = time.perf_counter()
+
+        # Store ROI data
+        unit_vals = get_roi(image, strc_mask)
+        base_activity[:, frame_counter] = unit_vals
+        frame_counter += 1
+        #print(f'*** Frames captured: {frame_counter}')
+
+        elapsed_time = time.perf_counter() - start_time
+        #print(f'Execution time: {elapsed_time} seconds')
+
+        if elapsed_time < frame_interval:
+            time.sleep(frame_interval - elapsed_time)
+
+    print('Finished baseline acquisition')
+    play_tone(7000, 1)
+    return base_activity

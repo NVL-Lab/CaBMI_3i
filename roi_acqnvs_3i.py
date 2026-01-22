@@ -25,6 +25,8 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
             test_info: dictionary containing dataframes with voltage data.
     """
     base_name = 'roi_bg'
+    # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
+    task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
     if not run:
         try:
             '''
@@ -32,8 +34,9 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
             roi_bg = np.load(matches[-1], allow_pickle=True)
             print(f'Loading {matches[-1].name}')
             '''
-            roi_bg_path = Path('F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy')
-            roi_bg = np.load(roi_bg_path)
+            roi_bg_path = Path(path_data['test_dir'])
+            roi_bg = np.load(roi_bg_path, mmap_mode="r", allow_pickle=True)
+            roi_bg = roi_bg[:1001]
             print('Retrieving ROI recording...')
             return roi_bg
         except FileNotFoundError:
@@ -47,8 +50,6 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
     task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
     roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
 
-    # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
-    task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
     roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
     return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})

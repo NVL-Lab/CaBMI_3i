@@ -80,7 +80,8 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     plot_path = save_path / 'plots'
 
     # Create the directory if it does not exist
-    plot_path.mkdir(parents=True, exist_ok=True)
+    if tset['save']:
+        plot_path.mkdir(parents=True, exist_ok=True)
 
     # Load data
     #data = loadmat(n_f_file)

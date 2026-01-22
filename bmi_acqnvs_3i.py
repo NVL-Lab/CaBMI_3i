@@ -1,6 +1,7 @@
 from datetime import datetime
 from contextlib import contextmanager
 from typing import Optional
+from pathlib import Path
 
 from wait_on_task_3i import *
 from rois.obtain_roi import get_roi
@@ -17,15 +18,20 @@ def on_cleanup(save_path, data, bdata):
         print('Cleaning...')
         #np.savez(save_path, data=data, bdata=bdata)
 
-def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None, default_run=False, run=False) -> np.ndarray:
+def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None, default_run=False, run=False, sim=False) -> np.ndarray:
     # base_val_seed are values to add to "initialize the baseline" instead of starting with ones or nans.
     # Save path
     base_name = 'bmi_online'
     if not run:
         try:
-            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
-            bdata = np.load(matches[-1], allow_pickle=True)
-            print(f'Loading {matches[-1].name}')
+            if sim:
+                recording_path = Path(path_data['test_dir'])
+                bdata = bmi_acqnvs_sim_3i(recording_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed)
+                print('Simulating baseline data...')
+            else:
+                matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+                bdata = np.load(matches[-1], allow_pickle=True)
+                print(f'Loading {matches[-1].name}')
             return bdata
         except FileNotFoundError:
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
@@ -124,7 +130,8 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
     if not debug_bool:
         # save_files_3i(path_data['save_path'], pl = None, expt_str)
         save_path_expt = path_data['save_path'] / 'im' / expt_str
-        save_path_expt.mkdir(parents=True, exist_ok=True)
+        if task_set['save']:
+            save_path_expt.mkdir(parents=True, exist_ok=True)
         strc_mask = np.load(path_data['save_path'] / 'strc_mask.npz', allow_pickle=True)['strc_mask'].item()
 
     # Give random reward to trigger the jetball
@@ -318,10 +325,12 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
 
     return bdata
 
-def bmi_acqnvs_sim_3i(roi_mask, task_set, bmi_path, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None) -> np.ndarray:
+def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, base_val_seed: Optional[np.ndarray]=None) -> np.ndarray:
     record = np.load(bmi_path, mmap_mode='r')
+    record = record[15000:45001]
     record_length = record.shape[0]
     task_set['recording_frames'] = record_length
+    task_set['resolution'] = (record.shape[2], record.shape[1])
 
     # Load flag configuration file
     flags = get_flags()[expt_str]
@@ -402,7 +411,8 @@ def bmi_acqnvs_sim_3i(roi_mask, task_set, bmi_path, path_data, expt_str, bdata, 
     if not debug_bool:
         # save_files_3i(path_data['save_path'], pl = None, expt_str)
         save_path_expt = path_data['save_path'] / 'im' / expt_str
-        save_path_expt.mkdir(parents=True, exist_ok=True)
+        if task_set['save']:
+            save_path_expt.mkdir(parents=True, exist_ok=True)
         strc_mask = np.load(path_data['save_path'] / 'strc_mask.npz', allow_pickle=True)['strc_mask'].item()
 
     # Give random reward to trigger the jetball

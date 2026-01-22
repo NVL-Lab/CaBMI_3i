@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 
 from params.play_tone import play_tone
 
-from roi_acqnvs_3i import get_roi_bg, get_roi_data
+#from roi_acqnvs_3i import get_roi_bg, get_roi_data
+import roi_acqnvs_3i
 from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
@@ -41,17 +42,18 @@ if __name__ == '__main__':
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
         'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}"),
-        #'test_data': np.load(exp_info['test_data_mac'])
+        'test_dir': Path(exp_info['testing']['onedrive']['win_dir'])
     }
-    path_data['save_path'].mkdir(parents=True, exist_ok=True)
+    if task_set['save']:
+        path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
     '''
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    roi_bg = get_roi_bg(task_set, path_data, True, False)
-    roi_info = get_roi_data(roi_bg, path_data, task_set, True, True)
+    roi_bg = roi_acqnvs_3i.get_roi_bg(task_set, path_data, True, False)
+    roi_info = roi_acqnvs_3i.get_roi_data(roi_bg, path_data, task_set, True, True)
 
     '''
         Baseline Acquisition
@@ -104,7 +106,7 @@ if __name__ == '__main__':
 
     # Define the type of experiment and run the BMI acquisition
     bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
-                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, True, True)
+                             0, [], fb_set['fb_bool'], fb_cal, np.ones(len(e1_base) + len(e2_base)) * np.nan, True, False, True)
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

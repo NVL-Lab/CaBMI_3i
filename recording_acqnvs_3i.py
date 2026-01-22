@@ -82,6 +82,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
 
 def baseline_acqnvs_sim_3i(roi_mask, task_set, baseline_path) -> np.ndarray:
     record = np.load(baseline_path, mmap_mode='r')
+    record = record[1000:15001]
     dilation_factor = 1  # 2
     # record_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
     record_length = record.shape[0]

@@ -7,6 +7,7 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dic
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
         'bmi_env': Path('utils/Tseries_BMI_30.env'),
+        'save': False,
 
         # Imaging
         'im': {

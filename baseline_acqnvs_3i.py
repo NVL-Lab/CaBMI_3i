@@ -24,9 +24,7 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=Fal
     if not run:
         try:
             if sim:
-                recording_path = Path(
-                    'F:/cabmi_rg_pmts/bmi_test/slidebook/capture_slide.dir/capture_test-1768411287-992.imgdir/ImageData_Ch1_TP0000000.npy',
-                    allow_pickle=True)
+                recording_path = Path(path_data['test_dir'])
                 bdata = baseline_acqnvs_sim_3i(roi_mask, task_set, recording_path)
                 print('Simulating baseline data...')
             else:
@@ -44,7 +42,8 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=Fal
     bdata_path = path_data['save_path'] / f'{base_name}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
 
     save_path_expt = path_data['save_path'] / 'im' / 'baseline'
-    #save_path_expt.mkdir(parents=True, exist_ok=True)
+    if task_set['save']:
+        save_path_expt.mkdir(parents=True, exist_ok=True)
 
     dilation_factor = 1 # 2
     #expected_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))

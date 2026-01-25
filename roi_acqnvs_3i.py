@@ -8,7 +8,7 @@ from recording_acqnvs_3i import recording_acqnvs_3i
 
 from pathlib import Path
 
-def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
+def get_roi_bg(task_set, path_data, default_run=False, run=False):
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -25,20 +25,24 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
             test_info: dictionary containing dataframes with voltage data.
     """
     base_name = 'roi_bg'
-    # int(task_set['im']['frame_rate'] * 60) # Actual microscope fps seems to be halved
-    task_set['roi']['recording_frames'] = 1100 # 1160 in actual record
+    task_set['roi']['recording_frames'] = int(np.ceil(task_set['im']['frame_rate'] * task_set['roi']['recording_len'])) # Actual microscope fps seems to be halved
+    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
+    print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
+
     if not run:
         try:
+            print('Retrieving ROI recording...')
             '''
             matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
             roi_bg = np.load(matches[-1], allow_pickle=True)
             print(f'Loading {matches[-1].name}')
             '''
-            roi_bg_path = Path(path_data['test_dir'])
-            roi_bg = np.load(roi_bg_path, mmap_mode="r", allow_pickle=True)
-            roi_bg = roi_bg[:1001]
-            print('Retrieving ROI recording...')
-            return roi_bg
+            roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
+            roi_bg = roi_bg[:task_set['roi']['recording_frames']]
+            if task_set['save']:
+                print(f'Saving ROI background to {roi_bg_path}...')
+                np.save(roi_bg_path, roi_bg, allow_pickle=True)
+            return roi_bg, task_set
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
@@ -48,14 +52,13 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False) -> np.ndarray:
     #sb_file_reader = wait_for_reader_with_capture(path_data['sldy_path'],task_set['roi']['capture'])
     sb_file_reader, task_set['roi']['capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
     task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
-    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
 
     roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
     return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
-def get_roi_data(image_data, path_data, task_set, plot=False, run=False) -> np.ndarray:
-    roi_data_path = path_data['save_path'] / 'roi_data.npz'
+def get_roi_data(image_data, path_data, task_set, plot=False, run=False):
+    roi_data_path = path_data['save_path'] / 'roi_info.npz'
     # Checks if ROI file already exists
     if not run:
         try:
@@ -96,22 +99,30 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=False) -> np.n
 
     print('Obtaining ROI mask!')
     print('----------------------------------------')
-    roi_mask = get_roi_mask(im_bg, path_data['save_path'])
+    roi_mask = get_roi_mask(im_bg, path_data['save_path']) # must save suite2p files
     roi_chan_data = [{}]
-    roi_info = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, task_set['im']['chan_data']['recording_chan'])
+    roi_data = label_mask2roi_data_single_channel(im_bg, roi_mask, roi_chan_data, task_set['im']['chan_data']['recording_chan'])
 
     # See ROI if needed
     if plot:
         plt.figure()
-        plt.imshow(roi_info['roi_mask'], cmap='gray')
-        plt.title(f'ROI Mask. Num Roi: {roi_info["num_rois"]}')
+        plt.imshow(roi_data['roi_mask'], cmap='gray')
+        plt.title(f'ROI Mask. Num Roi: {roi_data["num_rois"]}')
         plt.show()
 
         plt.figure()
-        plt.imshow(roi_info['im_roi'], cmap='gray')
-        plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_info["num_rois"]}')
+        plt.imshow(roi_data['im_roi'], cmap='gray')
+        plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
     print('----------------------------------------')
 
-    np.savez(roi_data_path, plot_images=plot_images, im_sc_struct=im_sc_struct, roi_data=roi_info, allow_pickle=True)
-    return np.load(roi_data_path, allow_pickle=True)
+    roi_info = {
+        'plot_images': plot_images,
+        'im_sc_struct': im_sc_struct,
+        'roi_data': roi_data
+    }
+
+    if task_set['save']:
+        np.savez_compressed(roi_data_path, **roi_info)
+
+    return roi_info

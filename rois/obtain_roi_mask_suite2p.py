@@ -98,7 +98,9 @@ def get_roi_mask(image, save_path):
 
         # Runs additional steps of pipeline
         im_path = suite2p_path / 'im_bg.npy'
+
         np.save(im_path, image)
+
         # Needed for the extraction and addition of ROIs
         print('Binarizing data...')
         _ = suite2p.io.BinaryFile(Ly=image.shape[1], Lx=image.shape[2], filename=im_path)  # reads in data from npy

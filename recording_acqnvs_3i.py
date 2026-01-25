@@ -7,16 +7,17 @@ from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from params.play_tone import play_tone
 
 @contextmanager
-def on_cleanup(image_path, image_data):
+def on_cleanup(image_path, image_data, task_set):
     try:
         yield
     except KeyboardInterrupt:
         print('Keyboard Interrupt')
     finally:
         print('Cleaning...')
-        #np.save(image_path, image_data, allow_pickle=True)
+        if task_set['save']:
+            np.save(image_path, image_data, allow_pickle=True)
 
-def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info) -> np.ndarray:
+def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info):
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -36,14 +37,10 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)
+    total_process_time = 0
     print('STARTING RECORDING!!!')
     with on_cleanup(image_path, image_data): # may want to change to another variable than roi_data_path and image_data/roi_data
-        while counter_same < 1000 and frame_counter < frame_limit:
-            # Stops recording when buffer is full
-            '''
-            if frame_counter >= frame_limit:
-                break
-            '''
+        while counter_same < 1000 and frame_counter < frame_limit: # Stops recording when buffer is full
             sb_file_reader.Refresh(capture)
             curr_time_point = sb_file_reader.GetNumTimepoints(capture) # Lost curr_time_point-1 frames
             print(f'*** Time Point: {curr_time_point}')
@@ -51,11 +48,6 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
             image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
                                                      task_set['im']['chan_data'][channel],
                                                      True)
-            '''
-            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                     task_set['im']['chan_data'][channel]['pmt_idx'],
-                                                     True)
-            '''
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
                 start_time = time.perf_counter()
@@ -72,32 +64,34 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
                 print(f'*** Frames captured: {frame_counter}')
 
                 elapsed_time = time.perf_counter() - start_time
+                total_process_time += elapsed_time
                 print(f'Execution time: {elapsed_time} seconds')
 
                 if elapsed_time < frame_interval:
                     time.sleep(frame_interval - elapsed_time)
             else:
                 counter_same += 1
-    return image_data
+    print('Total processing time: {:.2f} seconds'.format(total_process_time))
+    return image_data, task_set
 
-def baseline_acqnvs_sim_3i(roi_mask, task_set, baseline_path) -> np.ndarray:
-    record = np.load(baseline_path, mmap_mode='r')
-    record = record[1000:15001]
-    dilation_factor = 1  # 2
-    # record_length = int(np.ceil(task_set['cb']['baseline_len'] * task_set['im']['frame_rate'] * dilation_factor))
-    record_length = record.shape[0]
-    task_set['roi']['recording_frames'] = record_length
+def baseline_acqnvs_sim_3i(roi_mask, task_set, baseline_path):
+    record_raw = np.load(baseline_path, mmap_mode='r')
+    record_frames = task_set['cb']['baseline_frames']
+    record_frame_limit = task_set['roi']['recording_frames']+record_frames
+    record = record_raw[task_set['roi']['recording_frames']-1:record_frame_limit]
+
     task_set['im']['resolution'] = (record.shape[2], record.shape[1])
 
     number_neurons = int(np.max(roi_mask))
     strc_mask = obtain_strc_mask_from_mask(roi_mask)
-    base_activity = np.full((number_neurons, record_length), np.nan)
+    base_activity = np.full((number_neurons, record_frames), np.nan)
     frame_counter = 0
     frame_interval = 1 / (task_set['im']['frame_rate'] * 1.2)
+    total_process_time = 0
 
     print('STARTING RETRIEVAL!!!')
     print('Retrieving...')
-    for frame in range(record_length):
+    for frame in range(record_frames):
         image = record[frame]
         start_time = time.perf_counter()
 
@@ -114,5 +108,6 @@ def baseline_acqnvs_sim_3i(roi_mask, task_set, baseline_path) -> np.ndarray:
             time.sleep(frame_interval - elapsed_time)
 
     print('Finished baseline acquisition')
+    print('Total processing time: {:.2f} seconds'.format(total_process_time))
     play_tone(7000, 1)
-    return base_activity
+    return base_activity, task_set

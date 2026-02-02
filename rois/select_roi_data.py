@@ -38,13 +38,14 @@ def select_roi_data(roi_data, sel_idxs):
 
     # Visualize
     plt.figure(figsize=(8, 8))
-    plt.imshow(roi_data_sel['im_roi'])
-    #plt.axis('square')
     plt.title('Background Image + Rois')
+    plt.imshow(roi_data_sel['im_roi'])
+    plt.show()
 
     plt.figure(figsize=(8, 8))
-    plt.imshow(roi_data_sel['roi_mask'])
-    #plt.axis('square')
-    plt.title(f"Num ROI: {roi_data_sel['num_rois']}")
+    plt.title(f'Num ROI: {roi_data_sel["num_rois"]}')
+    #plt.imshow(roi_data_sel['roi_mask'], cmap='gray')
+    plt.imshow(roi_data['roi_mask'])
+    plt.show()
 
     return roi_data_sel, sel_idxs

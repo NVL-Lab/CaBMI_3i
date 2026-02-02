@@ -8,7 +8,7 @@ from recording_acqnvs_3i import recording_acqnvs_3i
 
 from pathlib import Path
 
-def get_roi_bg(task_set, path_data, default_run=False, run=False):
+def get_roi_bg(task_set, path_data, default_run=False, run=False, sim=False):
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -30,22 +30,22 @@ def get_roi_bg(task_set, path_data, default_run=False, run=False):
     print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
 
     if not run:
-        try:
+        if sim:
             print('Retrieving ROI recording...')
-            '''
-            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
-            roi_bg = np.load(matches[-1], allow_pickle=True)
-            print(f'Loading {matches[-1].name}')
-            '''
             roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
             roi_bg = roi_bg[:task_set['roi']['recording_frames']]
             if task_set['save']:
                 print(f'Saving ROI background to {roi_bg_path}...')
                 np.save(roi_bg_path, roi_bg, allow_pickle=True)
-            return roi_bg, task_set
-        except FileNotFoundError:
-            print('ROI data not found. Please run roi_acqnvs_3i')
-            exit(1)
+        else:
+            try:
+                matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+                roi_bg = np.load(matches[-1], allow_pickle=True)
+                print(f'Loading {matches[-1].name}...')
+            except FileNotFoundError:
+                print('ROI data not found. Please run roi_acqnvs_3i')
+                exit(1)
+        return roi_bg, task_set
 
     # Creates an instance of slidebook reader
     #task_set['roi']['capture'] = 0
@@ -63,7 +63,7 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=False):
     if not run:
         try:
             roi_data = np.load(roi_data_path, allow_pickle=True)
-            print(f'Loading {roi_data_path.name}')
+            print(f'Loading {roi_data_path.name}...')
             return roi_data
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
@@ -109,11 +109,13 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=False):
         plt.imshow(roi_data['roi_mask'], cmap='gray')
         plt.title(f'ROI Mask. Num Roi: {roi_data["num_rois"]}')
         plt.show()
+        plt.close()
 
         plt.figure()
         plt.imshow(roi_data['im_roi'], cmap='gray')
         plt.title(f'ROI footprint overlay in blue. Num ROI: {roi_data["num_rois"]}')
         plt.show()
+        plt.close()
     print('----------------------------------------')
 
     roi_info = {

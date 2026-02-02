@@ -13,24 +13,19 @@ def plot_neurons_baseline(base_activity, c_comp, yr_a, total_neurons=20):
     - total_neurons: Amount of neurons to be displayed (integer)
     """
     # Calculate standard deviation and mean
-    # Why skip the first 10 frames?
-    sm = np.nanstd(base_activity[:, 10:], axis=1) / np.nanmean(base_activity[:, 10:], axis=1)
     s = np.nanstd(base_activity[:, 10:], axis=1)
-    # custom
-    #sm = np.nanstd(base_activity[:, :10], axis=1) / np.nanmean(base_activity[:, :10], axis=1)
-    #s = np.nanstd(base_activity[:, :10], axis=1)
+    sm = s / np.nanmean(base_activity[:, 10:], axis=1)
 
     # Sort neurons based on sm and s
-    indm = np.argsort(sm)[::-1]
     ind = np.argsort(s)[::-1]
+    indm = np.argsort(sm)[::-1]
 
     # Display neuron indices from best to worst
-    print('Neurons from best to worst Sm:')
-    print(indm[:total_neurons])
     print('Neurons from best to worst S:')
     print(ind[:total_neurons])
+    print('Neurons from best to worst Sm:')
+    print(indm[:total_neurons])
 
-    # Plot std/mean
     subplot_nmb = int(np.ceil(np.sqrt(total_neurons)))
     plt.figure(figsize=(12, 12))
     

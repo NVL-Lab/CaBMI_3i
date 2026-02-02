@@ -8,7 +8,7 @@ from rois.obtain_roi import get_roi
 from calibration.dff2cursor_target import dff2cursor_target
 from calibration.cursor2audio import cursor2audio
 from expt2bmi_flags import get_flags
-from params.play_tone import play_tone
+from params.play_tone import *
 
 @contextmanager
 def on_cleanup(save_path, bmi_info, task_set):
@@ -153,21 +153,14 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
     # Upon termination (including interruption) of the following code, data will be saved
     with on_cleanup(bmi_data_path, bmi_info, task_set):
         while counter_same < 1000 and data['frame'] < expected_expt_length:
-            if debug_bool and data['frame'] > debug_input.shape[1]:  # debug_input.shape[1] or maybe len if 1D list
-                break
-
             sb_file_reader.Refresh(capture)  # Takes ~4ms
             curr_time_point = sb_file_reader.GetNumTimepoints(capture)
 
             print(f'*** Time Point: {curr_time_point}')
-            if not debug_bool:
-                # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-                image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
-                                                         task_set['im']['chan_data'][channel],
-                                                         True)
-                # image = path_data['test_data'][time_point]
-                if image.shape[0] == 0:
-                    break
+            # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
+            image = sb_file_reader.ReadImagePlaneBuf(capture, 0, curr_time_point - 1, z_plane,
+                                                     task_set['im']['chan_data'][channel],
+                                                     True)
 
             if curr_time_point != temp_time_point:
                 temp_time_point = curr_time_point
@@ -338,8 +331,10 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
 def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None) -> np.ndarray:
     record_raw = np.load(bmi_path, mmap_mode='r')
     record_frames = task_set['bmi_frames']
-    record_frame_limit = task_set['cb']['baseline_frames']+record_frames
-    record = record_raw[task_set['cb']['baseline_frames']-1:record_frame_limit]
+    #record_frame_limit = task_set['cb']['baseline_frames']+record_frames
+    record_frame_limit = record_raw.shape[0]
+    record = record_raw[record_frame_limit-record_frames-1:record_frame_limit]
+    record_frames = len(record) # Recording being used does not have enough frames
 
     task_set['resolution'] = (record.shape[2], record.shape[1])
 
@@ -355,6 +350,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
     # ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** ** *
 
     number_neurons = len(bdata['e_id'])
+    print('Number of Neurons: ', number_neurons)
 
     # Pre-allocating arrays
     fbuffer = np.full((number_neurons, task_set['dff_win']), np.nan, dtype=np.float64)
@@ -367,7 +363,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
         'trial_start': np.zeros(record_frames, dtype=np.float64),
 
         'cursor': np.full(record_frames, np.nan, dtype=np.float64),
-        'fb_freq': np.full(record_frames, np.nan, dtype=np.float64),
+        'fb_freq': np.full(record_frames, np.nan, dtype=np.float32),
         'time_vector': np.full(record_frames, np.nan, dtype=np.float64),
 
         'bmi_act': np.full((number_neurons, record_frames), np.nan, dtype=np.float64),
@@ -425,9 +421,11 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
     print('STARTING RECORDING!!!')
     print('baseBuffer filling!...')
     frame_counter = 0
-    if len(base_val) > 0:
-        base_buffer_full = True  # code says it would be at second frame but cant be
+    if not np.all(np.isnan(base_val)):
+        base_buffer_full = True
         print('baseBuffer seeded!')
+    #stream = make_stream()
+    #stream.start()
     # Upon termination (including interruption) of the following code, data will be saved
     for frame in range(non_buffer_update_counter, record_frames):
         image = record[frame]
@@ -445,8 +443,9 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
         fbuffer[:, -1] = unit_vals
 
         print('Calculating Baseline Buffer...')
-        if len(base_val) == 0 and frame_counter == 1:
+        if not base_buffer_full:
             base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
+            base_buffer_full = True
         elif not base_buffer_full and frame <= (init_frame_base + task_set['f0_win']):
             base_val += unit_vals / task_set['f0_win']
             if frame == (init_frame_base + task_set['f0_win']):
@@ -457,22 +456,27 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
             base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
 
         data['base_vector'][:, frame] = base_val
+        #print(base_val)
 
-        print('Processing...')
+        #print('Processing...')
         fs_smooth = np.nanmean(fbuffer, axis=1, dtype=np.float64)
 
         if base_buffer_full:
             dff = (fs_smooth - base_val) / base_val
             _, cursor_i, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool = dff2cursor_target(
                 dff, bdata, task_set['cursor_zscore_bool'])
-            print(f'Cursor: {cursor_i}')
+
+            #print(f'Cursor: {cursor_i}')
             data['cursor'][frame] = cursor_i
 
             fb_freq_i = cursor2audio(cursor_i, fb_cal, fb_cal['settings'])
             data['fb_freq'][frame] = fb_freq_i
 
+            '''
             if fb_bool:
                 play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
+                #stream.write(data['fb_freq'][frame])
+            '''
 
         if buffer_update_counter > 0:
             buffer_update_counter -= 1
@@ -525,7 +529,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
 
         # TODO: get water delivery setup
         if deliver_water:
-            play_tone(9000, 1)
+            #play_tone(9000, 1)
             '''
             a.write_digital("D9", 1)
             time.sleep(1)
@@ -537,8 +541,8 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
         if deliver_stim:
             if task_set['delay_flag']:
                 time.sleep(task_set['delay_time'])
-            play_tone(5000, 0.2)
-            play_tone(3000, 1)
+            #play_tone(5000, 0.2)
+            #play_tone(3000, 1)
             '''
             a.write_digital("D5", 1)
             time.sleep(0.2)

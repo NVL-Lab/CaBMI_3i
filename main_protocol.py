@@ -33,7 +33,7 @@ from check_motor_behavior import check_motor_behavior
 if __name__ == '__main__':
     # Acquire experiment settings
     fb_set = get_fb_settings()
-    task_set = get_bmi_settings(save=True)
+    task_set = get_bmi_settings(save=False)
     exp_info = get_exp_info(exp_type='testing')
 
     # Storing path and environment data
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}").expanduser().resolve(),
         'test_dir': Path(exp_info['recording_onedrive_mac_dir'])
     }
-    if task_set['save']:
+    if task_set['save'] and task_set['sim']:
         path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
@@ -52,32 +52,30 @@ if __name__ == '__main__':
         ROI Acquisition
             Capture the image and input the capture index
     '''
-    roi_bg, task_set = roi_acqnvs_3i.get_roi_bg(task_set, path_data, True, False)
-    roi_info = roi_acqnvs_3i.get_roi_data(roi_bg, path_data, task_set, True, True)
-    print(roi_info)
-    exit()
+    roi_bg, task_set = roi_acqnvs_3i.get_roi_bg(task_set, path_data, True, False, False)
+    roi_info = roi_acqnvs_3i.get_roi_data(roi_bg, path_data, task_set, True, False)
 
     '''
         Baseline Acquisition
     '''
-    if task_set['save']:
+    if isinstance(roi_info, np.lib.npyio.NpzFile):
         roi_data = roi_info['roi_data'].item()
     else:
         roi_data = roi_info['roi_data']
 
     # for each frame, the roi mean will be within a numpy array index
     # there will be n (number of ROIs) arrays, within each array
-    bdata, task_set = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], True, False, True)
+    bdata, task_set = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'], True, False, False)
 
-    plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
+    #plot_neurons_baseline(bdata, None, None, np.max(roi_data['num_rois']))
     # Choose out of the neurons found
-    e1_base = sorted([1, 15]) #sorted([16, 30])
-    e2_base = sorted([10, 20]) #sorted([10, 25])
-    plot_neurons_ensemble(bdata, e1_base + e2_base, [1] * len(e1_base) + [2] * len(e2_base))
-    select_roi_data(roi_data, list(set(e2_base) | set(e1_base)))
+    e1_base = sorted([23, 15]) #sorted([16, 30])
+    e2_base = sorted([6, 40]) #sorted([10, 25])
+    #plot_neurons_ensemble(bdata, e1_base + e2_base, [1] * len(e1_base) + [2] * len(e2_base))
+    #select_roi_data(roi_data, list(set(e2_base) | set(e1_base))) # what is the point
 
-    baseline_frame_rate = np.sum(~np.isnan(bdata[0, :])) / task_set['im']['frame_rate'] # num_base_samples / fr
-    sec_per_reward_range = np.array([120, 90])
+    baseline_frame_rate = np.sum(~np.isnan(bdata[0, :])) / task_set['cb']['baseline_len'] #task_set['im']['frame_rate']
+    sec_per_reward_range = np.array(task_set['cb']['sec_per_reward_range'])
     frames_per_reward_range = sec_per_reward_range * baseline_frame_rate
     print('Time (s) per reward range:')
     print(sec_per_reward_range)
@@ -110,9 +108,12 @@ if __name__ == '__main__':
     plt.title(roi_info['plot_images'][1]['label'])
     plt.show()
 
+    #base_val_seed = np.full((4, 1), np.nan) #np.ones(len(e1_base) + len(e2_base)) * np.nan
+    base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan
+
     # Define the type of experiment and run the BMI acquisition
     bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim + task_set['f0_win'],
-                             0, [], fb_set['fb_bool'], fb_cal, strc_info, np.ones(len(e1_base) + len(e2_base)) * np.nan, True, False, True)
+                             0, [], fb_set['fb_bool'], fb_cal, strc_info, base_val_seed, True, False, True)
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

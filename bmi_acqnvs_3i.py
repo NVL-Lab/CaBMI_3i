@@ -19,7 +19,7 @@ def on_cleanup(save_path, bmi_info, task_set):
         if task_set['save']:
             np.savez_compressed(save_path, **bmi_info)
 
-def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val_seed: Optional[np.ndarray]=None, default_run=False, run=False, sim=False) -> np.ndarray:
+def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None, default_run=False, run=False, sim=False) -> np.ndarray:
     # base_val_seed are values to add to "initialize the baseline" instead of starting with ones or nans.
     # Save path
     base_name = 'bmi_online'
@@ -33,7 +33,7 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
             recording_path = path_data['test_dir']
             print('Simulating bmi...')
             bdata = bmi_acqnvs_sim_3i(recording_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
-                                      debug_input, fb_bool, fb_cal, strc_info, base_val_seed)
+                                      debug_input, fb_bool, fb_cal, strc_info, base_val)
         else:
             try:
                 matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
@@ -132,14 +132,13 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
     z_plane = int(plane_count / 2)
     bmi_info = {}
 
-    if not debug_bool:
-        # save_files_3i(path_data['save_path'], pl = None, expt_str)
-        if task_set['save']:
-            save_path_expt = path_data['save_path'] / 'im' / expt_str
-            save_path_expt.mkdir(parents=True, exist_ok=True)
-            strc_mask = np.load(path_data['save_path'] / 'strc_info.npz', allow_pickle=True)['strc_mask'].item()
-        else:
-            strc_mask = strc_info['strc_mask']
+    # save_files_3i(path_data['save_path'], pl = None, expt_str)
+    if task_set['save']:
+        save_path_expt = path_data['save_path'] / 'im' / expt_str
+        save_path_expt.mkdir(parents=True, exist_ok=True)
+        strc_mask = np.load(path_data['save_path'] / 'strc_info.npz', allow_pickle=True)['strc_mask'] ##.item()
+    else:
+        strc_mask = strc_info['strc_mask']
 
     # Give random reward to trigger the jetball
     '''
@@ -162,166 +161,153 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
                                                      task_set['im']['chan_data'][channel],
                                                      True)
 
-            if curr_time_point != temp_time_point:
-                temp_time_point = curr_time_point
-                print(f'*** Frames captured: {data["frame"]+1}')
-                start_time = time.perf_counter()
+            # Code will only run when in current time point
+            if curr_time_point == temp_time_point:
+                continue
 
-                if non_buffer_update_counter == 0:
-                    print('Extracting ROI Mask...')
-                    if not debug_bool:
-                        unit_vals = get_roi(image, strc_mask)  # obtain roi values
+            if non_buffer_update_counter > 0:
+                non_buffer_update_counter -= 1
+                continue
+
+            temp_time_point = curr_time_point
+            print(f'*** Frames captured: {data["frame"]+1}')
+            start_time = time.perf_counter()
+
+            print('Extracting ROI Mask...')
+            unit_vals = get_roi(image, strc_mask)  # obtain roi values
+            data['bmi_act'][:, data['frame']] = unit_vals
+
+            fbuffer[:, :-1] = fbuffer[:, 1:]
+            fbuffer[:, -1] = unit_vals
+
+            print('Calculating Baseline Buffer...')
+            if not base_buffer_full:
+                if data['frame'] == 0:
+                    if not np.all(np.isnan(base_val)):
+                        base_buffer_full = True
+                        print('baseBuffer seeded!')
                     else:
-                        unit_vals = debug_input[:, data["frame"]]
-                    data['bmi_act'][:, data['frame']] = unit_vals
+                        base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
+                elif data['frame'] < task_set['f0_win']:
+                    base_val += unit_vals / task_set['f0_win']
+                elif data['frame'] == task_set['f0_win']:
+                    base_buffer_full = True
+                    print('baseBuffer FULL!')
+            else:
+                print('Rolling base buffer...')
+                base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
 
-                    fbuffer[:, :-1] = fbuffer[:, 1:]
-                    fbuffer[:, -1] = unit_vals
+            data['base_vector'][:, data['frame']] = base_val
 
-                    print('Calculating Baseline Buffer...')
-                    if data['frame'] == init_frame_base:
-                        if base_val_seed:
-                            base_buffer_full = True
-                            base_val = base_val_seed
-                            print('baseBuffer seeded!')
-                        else:
-                            base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
-                    elif not base_buffer_full and data['frame'] <= (init_frame_base + task_set['f0_win']):
-                        base_val += unit_vals / task_set['f0_win']
-                        if data['frame'] == (init_frame_base + task_set['f0_win']):
-                            base_buffer_full = True
-                            print('baseBuffer FULL!')
+            print('Processing...')
+            fs_smooth = np.nanmean(fbuffer, axis=1, dtype=np.float64)
+
+            if base_buffer_full:
+                dff = (fs_smooth - base_val) / base_val
+                _, cursor_i, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool = dff2cursor_target(
+                    dff, bdata, task_set['cursor_zscore_bool'])
+                data['cursor'][data['frame']] = cursor_i
+
+                fb_freq_i = cursor2audio(cursor_i, fb_cal, fb_cal['settings']) #fb_cal['settings'].item()
+                data['fb_freq'][data['frame']] = fb_freq_i
+
+                if fb_bool:
+                    #play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
+                    print('TONE PLAYED!')
+
+                if buffer_update_counter == 0:
+                    if trial_flag and not back2baseline_flag:
+                        data['trial_start'][data['frame']] = 1
+                        data['trial_counter'] += 1
+                        trial_flag = False
+                        print('New Trial!')
+
+                    if back2baseline_flag:
+                        if data['cursor'][data['frame']] <= back2base:
+                            back2base_counter += 1
+                        if back2base_counter >= task_set['back2base_frame_thresh']:
+                            back2baseline_flag = False
+                            back2base_counter = 0
+                            print('back to baseline')
                     else:
-                        print('Rolling base buffer...')
-                        base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
+                        if target_hit:
+                            print('target hit')
+                            data['self_target_counter'] += 1
+                            data['self_hits'][data['frame']] = 1
+                            print(f'Trial: {data["trial_counter"]}, Num Self Hits: {data["self_target_counter"]}')
 
-                    data['base_vector'][:, data['frame']] = base_val
+                            if flags['bmi_stim']:
+                                if flags['dr_stim']:
+                                    deliver_stim = 1
+                                    data['self_target_dr_stim_counter'] += 1
+                                    data['self_dr_stim'][data['frame']] = 1
+                                    print(f'Trial: {data["trial_counter"]}, DR STIMS: {data["self_target_dr_stim_counter"]}')
+                                if flags['water']:
+                                    deliver_water = 1
+                                    data['water_counter'] += 1
+                                    data['vector_water'][data['frame']] = 1
+                                    print(f'Trial: {data["trial_counter"]}, Water: {data["water_counter"]}')
 
-                    print('Processing...')
-                    fs_smooth = np.nanmean(fbuffer, axis=1, dtype=np.float64)
+                                print('Target Achieved! (self-target)')
 
-                    if debug_bool:
-                        data['fsmooth'][:, data['frame']] = fs_smooth
+                                if not debug_bool:
+                                    print('RewardTone delivery!')
+                                buffer_update_counter = relaxation_frames
+                                back2baseline_flag = True
+                                trial_flag = True
+                        if not trial_flag and flags['stim_random']:
+                            if data['frame'] in data['vector_stim']:
+                                deliver_stim = 1
+                                print('SCHEDULED DR STIM')
+                                data['sched_random_stim'] += 1
+                                data['random_dr_stim'][data['frame']] = 1
 
-                    if base_buffer_full:
-                        dff = (fs_smooth - base_val) / base_val
-                        _, cursor_i, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool = dff2cursor_target(
-                            dff, bdata, task_set['cursor_zscore_bool'])
-                        print(f'Cursor: {cursor_i}')
-                        data['cursor'][data['frame']] = cursor_i
+            if buffer_update_counter > 0:
+                buffer_update_counter -= 1
 
-                        if debug_bool:
-                            data['dff'][:, data['frame']] = dff
-                            data['c1_bool'][data['frame']] = c1_bool
-                            data['c2_val'][data['frame']] = c2_val
-                            data['c2_bool'][data['frame']] = c2_bool
-                            data['c3_val'][data['frame']] = c3_val
-                            data['c3_bool'][data['frame']] = c3_bool
+            # TODO: get water delivery setup
+            if deliver_water:
+                #play_tone(9000, 1)
+                '''
+                a.write_digital("D9", 1)
+                time.sleep(1)
+                a.write_digital("D9", 0)
+                '''
+                deliver_water = 0
+                print('water delivered!')
 
-                        fb_freq_i = cursor2audio(cursor_i, fb_cal, fb_cal['settings'].item())
-                        data['fb_freq'][data['frame']] = fb_freq_i
+            if deliver_stim:
+                if task_set['delay_flag']:
+                    time.sleep(task_set['delay_time'])
+                #play_tone(5000, 0.2)
+                #play_tone(3000, 1)
+                '''
+                a.write_digital("D5", 1)
+                time.sleep(0.2)
+                a.write_digital("D5", 0)
+                a.write_digital("D3", 1)
+                time.sleep(1)
+                a.write_digital("D3", 0)
+                '''
+                deliver_stim = 0
+                print('stim delivered!')
 
-                        if fb_bool and not debug_bool:
-                            play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
+            print('Moving Frame...')
+            data['frame'] += 1
+            data['time_vector'][data['frame']] = time.perf_counter() - start_time
+            print(f'Execution time: {data["time_vector"][data["frame"]]} seconds')
+            counter_same = 0
 
-                        if buffer_update_counter == 0 and base_buffer_full:
-                            if trial_flag and not back2baseline_flag:
-                                data['trial_start'][data['frame']] = 1
-                                data['trial_counter'] += 1
-                                trial_flag = False
-                                print('New Trial!')
+            if data['time_vector'][data['frame']] < 1 / (
+                    task_set['im']['frame_rate'] * 1.2):
+                time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
 
-                            if back2baseline_flag:
-                                if data['cursor'][data['frame']] <= back2base:
-                                    back2base_counter += 1
-                                if back2base_counter >= task_set['back2base_frame_thresh']:
-                                    back2baseline_flag = False
-                                    back2base_counter = 0
-                                    print('back to baseline')
-                            else:
-                                if target_hit:
-                                    print('target hit')
-                                    data['self_target_counter'] += 1
-                                    data['self_hits'][data['frame']] = 1
-                                    print(f'Trial: {data["trial_counter"]}, Num Self Hits: {data["self_target_counter"]}')
-
-                                    if flags['bmi_stim']:
-                                        if flags['dr_stim']:
-                                            deliver_stim = 1
-                                            data['self_target_dr_stim_counter'] += 1
-                                            data['self_dr_stim'][data['frame']] = 1
-                                            print(f'Trial: {data["trial_counter"]}, DR STIMS: {data["self_target_dr_stim_counter"]}')
-                                        if flags['water']:
-                                            deliver_water = 1
-                                            data['water_counter'] += 1
-                                            data['vector_water'][data['frame']] = 1
-                                            print(f'Trial: {data["trial_counter"]}, Water: {data["water_counter"]}')
-
-                                        print('Target Achieved! (self-target)')
-
-                                        if not debug_bool:
-                                            print('RewardTone delivery!')
-                                        buffer_update_counter = relaxation_frames
-                                        back2baseline_flag = True
-                                        trial_flag = True
-                                if not trial_flag and flags['stim_random']:
-                                    if data['frame'] in data['vector_stim']:
-                                        deliver_stim = 1
-                                        print('SCHEDULED DR STIM')
-                                        data['sched_random_stim'] += 1
-                                        data['random_dr_stim'][data['frame']] = 1
-                        else:
-                            if buffer_update_counter > 0:
-                                buffer_update_counter -= 1
-                else:
-                    if non_buffer_update_counter > 0:
-                        non_buffer_update_counter -= 1
-
-                # TODO: get water delivery setup
-                if deliver_water:
-                    if not debug_bool:
-                        play_tone(9000, 1)
-                        '''
-                        a.write_digital("D9", 1)
-                        time.sleep(1)
-                        a.write_digital("D9", 0)
-                        '''
-                    deliver_water = 0
-                    print('water delivered!')
-
-                if deliver_stim:
-                    if task_set['delay_flag']:
-                        time.sleep(task_set['delay_time'])
-                    if not debug_bool:
-                        play_tone(5000, 0.2)
-                        play_tone(3000, 1)
-                        '''
-                        a.write_digital("D5", 1)
-                        time.sleep(0.2)
-                        a.write_digital("D5", 0)
-                        a.write_digital("D3", 1)
-                        time.sleep(1)
-                        a.write_digital("D3", 0)
-                        '''
-                    deliver_stim = 0
-                    print('stim delivered!')
-
-                print('Moving Frame...')
-                data['frame'] += 1
-                data['time_vector'][data['frame']] = time.perf_counter() - start_time
-                print(f'Execution time: {data["time_vector"][data["frame"]]} seconds')
-                counter_same = 0
-
-                if not debug_bool and data['time_vector'][data['frame']] < 1 / (
-                        task_set['im']['frame_rate'] * 1.2):
-                    time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
-
-        elapsed_time = time.perf_counter() - start_time
-        #print(f'Execution time: {elapsed_time} seconds')
-        if elapsed_time < frame_interval:
-            time.sleep(frame_interval - elapsed_time)
-        else:
-            counter_same += 1
+            elapsed_time = time.perf_counter() - start_time
+            #print(f'Execution time: {elapsed_time} seconds')
+            if elapsed_time < frame_interval:
+                time.sleep(frame_interval - elapsed_time)
+            else:
+                counter_same += 1
 
         bmi_info['bdata'] = bdata
         bmi_info['data'] = data
@@ -389,7 +375,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
     #: TODO: Nuria changed the following to remove the 0 back to the tset value
     non_buffer_update_counter = task_set['prefix_win']  # Counter when we don't want to update the buffer
     # TODO: Nuria changed this back from the 0 back to the value of the non-buffer-update
-    init_frame_base = non_buffer_update_counter + 1
+    init_frame_base = non_buffer_update_counter# + 1
     # Beginning of experiment and VTA stim
     buffer_update_counter = 0
 
@@ -444,16 +430,30 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
 
         print('Calculating Baseline Buffer...')
         if not base_buffer_full:
-            base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
-            base_buffer_full = True
-        elif not base_buffer_full and frame <= (init_frame_base + task_set['f0_win']):
-            base_val += unit_vals / task_set['f0_win']
-            if frame == (init_frame_base + task_set['f0_win']):
+            if frame == non_buffer_update_counter:
+                base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
+            elif frame < task_set['f0_win']:
+                base_val += unit_vals / task_set['f0_win']
+            elif frame == task_set['f0_win']:
                 base_buffer_full = True
                 print('baseBuffer FULL!')
-        else: # frame > (init_frame_base + task_set['f0_win'])
+        else:
             print('Rolling base buffer...')
             base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
+
+        '''
+        if not base_buffer_full and frame == non_buffer_update_counter:
+            base_val = np.ones(number_neurons, dtype=np.float64) * unit_vals / task_set['f0_win']
+            #base_buffer_full = True
+        elif not base_buffer_full and frame < task_set['f0_win']: #(init_frame_base + task_set['f0_win']):
+            base_val += unit_vals / task_set['f0_win']
+        elif not base_buffer_full and frame == task_set['f0_win']: #(init_frame_base + task_set['f0_win']):
+            base_buffer_full = True
+            print('baseBuffer FULL!')
+        else: # frame >task_set['f0_win'] # frame > (init_frame_base + task_set['f0_win'])
+            print('Rolling base buffer...')
+            base_val = (base_val * (task_set['f0_win'] - 1) + unit_vals) / task_set['f0_win']
+        '''
 
         data['base_vector'][:, frame] = base_val
         #print(base_val)
@@ -472,60 +472,60 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
             fb_freq_i = cursor2audio(cursor_i, fb_cal, fb_cal['settings'])
             data['fb_freq'][frame] = fb_freq_i
 
-            '''
             if fb_bool:
                 play_tone(fb_freq_i, fb_cal['settings']['arduino']['duration'])
                 #stream.write(data['fb_freq'][frame])
-            '''
+                print('TONE PLAYED!')
+
+            if buffer_update_counter == 0:
+                if trial_flag and not back2baseline_flag:
+                    data['trial_start'][frame] = 1
+                    data['trial_counter'] += 1
+                    trial_flag = False
+                    print('New Trial!')
+
+                if back2baseline_flag:
+                    if data['cursor'][frame] <= back2base:
+                        back2base_counter += 1
+                    if back2base_counter >= task_set['back2base_frame_thresh']:
+                        back2baseline_flag = False
+                        back2base_counter = 0
+                        print('back to baseline')
+                else:
+                    if target_hit:
+                        print('target hit')
+                        data['self_target_counter'] += 1
+                        data['self_hits'][frame] = 1
+                        print(f'Trial: {data["trial_counter"]}, Num Self Hits: {data["self_target_counter"]}')
+
+                        if flags['bmi_stim']:
+                            if flags['dr_stim']:
+                                deliver_stim = 1
+                                data['self_target_dr_stim_counter'] += 1
+                                data['self_dr_stim'][frame] = 1
+                                print(
+                                    f'Trial: {data["trial_counter"]}, DR STIMS: {data["self_target_dr_stim_counter"]}')
+                            if flags['water']:
+                                deliver_water = 1
+                                data['water_counter'] += 1
+                                data['vector_water'][frame] = 1
+                                print(f'Trial: {data["trial_counter"]}, Water: {data["water_counter"]}')
+
+                            print('Target Achieved! (self-target)')
+
+                            print('RewardTone delivery!')
+                            buffer_update_counter = relaxation_frames
+                            back2baseline_flag = True
+                            trial_flag = True
+                    if not trial_flag and flags['stim_random']:
+                        if frame in data['vector_stim']:
+                            deliver_stim = 1
+                            print('SCHEDULED DR STIM')
+                            data['sched_random_stim'] += 1
+                            data['random_dr_stim'][frame] = 1
 
         if buffer_update_counter > 0:
             buffer_update_counter -= 1
-        elif base_buffer_full:
-            if trial_flag and not back2baseline_flag:
-                data['trial_start'][frame] = 1
-                data['trial_counter'] += 1
-                trial_flag = False
-                print('New Trial!')
-
-            if back2baseline_flag:
-                if data['cursor'][frame] <= back2base:
-                    back2base_counter += 1
-                if back2base_counter >= task_set['back2base_frame_thresh']:
-                    back2baseline_flag = False
-                    back2base_counter = 0
-                    print('back to baseline')
-            else:
-                if target_hit:
-                    print('target hit')
-                    data['self_target_counter'] += 1
-                    data['self_hits'][frame] = 1
-                    print(f'Trial: {data["trial_counter"]}, Num Self Hits: {data["self_target_counter"]}')
-
-                    if flags['bmi_stim']:
-                        if flags['dr_stim']:
-                            deliver_stim = 1
-                            data['self_target_dr_stim_counter'] += 1
-                            data['self_dr_stim'][frame] = 1
-                            print(
-                                f'Trial: {data["trial_counter"]}, DR STIMS: {data["self_target_dr_stim_counter"]}')
-                        if flags['water']:
-                            deliver_water = 1
-                            data['water_counter'] += 1
-                            data['vector_water'][frame] = 1
-                            print(f'Trial: {data["trial_counter"]}, Water: {data["water_counter"]}')
-
-                        print('Target Achieved! (self-target)')
-
-                        print('RewardTone delivery!')
-                        buffer_update_counter = relaxation_frames
-                        back2baseline_flag = True
-                        trial_flag = True
-                if not trial_flag and flags['stim_random']:
-                    if frame in data['vector_stim']:
-                        deliver_stim = 1
-                        print('SCHEDULED DR STIM')
-                        data['sched_random_stim'] += 1
-                        data['random_dr_stim'][frame] = 1
 
         # TODO: get water delivery setup
         if deliver_water:

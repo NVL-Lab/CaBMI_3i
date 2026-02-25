@@ -90,7 +90,7 @@ def wait_for_capture(file_path, reader, capture, wait_seconds=500):
 
     return reader
 
-def get_recording_settings(sb_file_reader, capture, task_set, default_run):
+def get_recording_settings(sb_file_reader, capture, task_set):
     channel_count = sb_file_reader.GetNumChannels(capture)
     print(f'*** Number of channels in Capture {capture}: {channel_count}')
 
@@ -101,12 +101,12 @@ def get_recording_settings(sb_file_reader, capture, task_set, default_run):
         channels_available.append(channel_name)
 
     if channel_count > 1:
-        if default_run:
-            channel_name = 'R PMT'
-            channel_index = channels_available.index(channel_name)
-        else:
+        if task_set['im']['chan_data']['recording_chan'] == '':
             channel_index = int(input(f'Select which channel to image from: {channels_available} (Type 0 to n-1)'))
             channel_name = channels_available[channel_index]
+        else:
+            channel_name = task_set['im']['chan_data']['recording_chan']
+            channel_index = channels_available.index(channel_name)
     else:
         channel_index = 0
         channel_name = channels_available[channel_index]

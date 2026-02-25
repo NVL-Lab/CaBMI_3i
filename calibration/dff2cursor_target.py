@@ -20,23 +20,22 @@ def dff2cursor_target(dff, bdata, cursor_zscore_bool):
     Returns:
     tuple: (dff_z, cursor, target_hit, c1_bool, c2_val, c2_bool, c3_val, c3_bool)
     """
-    num_e2 = len(bdata['e2_sel_idxs'].flatten())
+    num_e2 = len(bdata['e2_sel_idxs'])
 
     # Ensure dff is a row vector
-    dff = np.array(dff).flatten()
+    dff = np.array(dff)
     dff_z = dff
 
     # Z-score normalization if required
     if cursor_zscore_bool:
         dff_z = (dff - bdata['n_mean']) / bdata['n_std']
-        dff_z = dff_z.flatten()  # Ensure dff_z is a row vector
         n_analyze = dff_z
     else:
         n_analyze = dff
 
     # Select E1 and E2 ensembles
-    e1 = n_analyze[bdata['e1_sel_idxs'].flatten()-1]
-    e2 = n_analyze[bdata['e2_sel_idxs'].flatten()-1]
+    e1 = n_analyze[bdata['e1_sel_idxs']]
+    e2 = n_analyze[bdata['e2_sel_idxs']]
 
     # c1: cursor
     cursor = np.dot(n_analyze, bdata['decoder'])

@@ -2,7 +2,7 @@ from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] = (403, 390)) -> Dict:
+def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: str = '') -> Dict:
     #fr = 29.752 # Prairie
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
@@ -18,7 +18,7 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
             'chan_data': {
-                'recording_chan': 'R PMT' # Standard, but subject to change based on microscope operation
+                'recording_chan': rec # Standard, but subject to change based on microscope operation
             }
         },
 
@@ -34,8 +34,8 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
 
         # Calibration
         'cb': {
-            'sec_per_reward_range': [120, 90], # [100 70]; [120 90]; [70, 50] a range on how many frames (per sec) should elapse before a reward is expected.  Used to calibrate the target patterns.
-            'baseline_len': 10*60,          # Seconds (15*60) #20
+            'sec_per_reward_range': [70, 50], # [100 70]; [120 90]; [70, 50] a range on how many frames (per sec) should elapse before a reward is expected.  Used to calibrate the target patterns.
+            'baseline_len': 15*60, #10*60,          # Seconds (15*60) #20
             'f0_win_bool': True,      # During cb, if true, estimate f0 with a window of activity.  if false, estimate f0 using the full baseline,
             'dff_win_bool': True,
             'f0_init_slide': False,   # During cb, if 0, f0 is only used after f0_win samples. If 1, f0 is adapted in the window from 0 to f0_win samples.
@@ -49,8 +49,8 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
         },
 
         # BMI
-        'bmi_len': 10*60, # Seconds (30x60)
-        'prefix_win': 40,
+        'bmi_len': 30*60, # Seconds (30x60) (10*60)
+        'prefix_win': 40, # skip the first 40
         'f0_win': 1*60*math.ceil(fr),
         'dff_win': 10, # dff is calculated with last n frames
         'range_norm_bool': True,

@@ -7,7 +7,7 @@ from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from params.play_tone import play_tone
 from recording_acqnvs_3i import recording_acqnvs_3i, baseline_acqnvs_sim_3i
 
-def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=False, sim=False):
+def baseline_acqnvs_3i(task_set, path_data, roi_mask, run=''):
     # Save path
     base_name = 'baseline_online'
     dilation_factor = 1 # 2
@@ -15,35 +15,33 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask, default_run=False, run=Fal
 
     bdata_path = path_data['save_path'] / f'{base_name}_{datetime.now().strftime("%y%m%dt%H%M%S")}.npy'
 
-    '''
     save_path_expt = path_data['save_path'] / 'im' / 'baseline'
     if task_set['save']:
         save_path_expt.mkdir(parents=True, exist_ok=True)
-    '''
 
     print(f'Baseline recording will consist of {task_set["cb"]["baseline_frames"]} frames')
 
-    if not run:
-        if sim:
-            print('Simulating baseline data...')
-            recording_path = path_data['test_dir']
-            base_activity, task_set = baseline_acqnvs_sim_3i(roi_mask, task_set, recording_path)
-            if task_set['save']:
-                print(f'Saving baseline data to {bdata_path}...')
-                np.save(bdata_path, base_activity, allow_pickle=True)
-        else:
-            try:
-                matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
-                base_activity = np.load(matches[-1], allow_pickle=True)
-                print(f'Loading {matches[-1].name}...')
-            except FileNotFoundError:
-                print('Baseline data not found. Please run baseline_acqnvs_3i.')
-                exit(1)
+    if run == 'sim':
+        print('Simulating baseline data...')
+        recording_path = path_data['test_dir']
+        base_activity, task_set = baseline_acqnvs_sim_3i(roi_mask, task_set, recording_path)
+        if task_set['save']:
+            print(f'Saving baseline data to {bdata_path}...')
+            np.save(bdata_path, base_activity, allow_pickle=True)
+        return base_activity, task_set
+    elif run == 'retrieve':
+        try:
+            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+            base_activity = np.load(matches[-1], allow_pickle=True)
+            print(f'Loading {matches[-1].name}...')
+        except FileNotFoundError:
+            print('Baseline data not found. Please run baseline_acqnvs_3i.')
+            exit(1)
         return base_activity, task_set
 
     # Creates an instance of slidebook reader
     sb_file_reader, task_set['cb']['baseline_capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])
-    task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set, default_run)
+    task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set)
 
     # Initialize baseline variables
     number_neurons = int(np.max(roi_mask))

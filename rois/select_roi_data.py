@@ -24,14 +24,14 @@ def select_roi_data(roi_data, sel_idxs):
     for i in range(roi_data_sel['num_rois']):
         roi_num = sel_idxs[i]
         roi_i = roi_data_sel['roi_bin_cell'][i]
-        roi_idxs = np.where(roi_i)[0]
-        roi_data_sel['roi_mask'].flat[roi_idxs] = roi_num
-        roi_data_sel['roi_mask_bin'].flat[roi_idxs] = 1
+        roi_row_idxs, roi_col_idxs = np.where(roi_i)
+        roi_data_sel['roi_mask'][roi_row_idxs, roi_col_idxs] = roi_num
+        roi_data_sel['roi_mask_bin'][roi_row_idxs, roi_col_idxs] = 1
 
         chan_idx = np.where(roi_data_sel['chan_logical'][:, i])[0]
         for c in chan_idx:
             chan_im = roi_data_sel['im_roi_rg'][:, :, c]
-            chan_im.flat[roi_idxs] = 1
+            chan_im[roi_row_idxs, roi_col_idxs] = 1
             roi_data_sel['im_roi_rg'][:, :, c] = chan_im
 
     roi_data_sel['im_roi'][:, :, 2] = roi_data_sel['roi_mask_bin']
@@ -40,12 +40,11 @@ def select_roi_data(roi_data, sel_idxs):
     plt.figure(figsize=(8, 8))
     plt.title('Background Image + Rois')
     plt.imshow(roi_data_sel['im_roi'])
-    plt.show()
 
     plt.figure(figsize=(8, 8))
-    plt.title(f'Num ROI: {roi_data_sel["num_rois"]}')
-    #plt.imshow(roi_data_sel['roi_mask'], cmap='gray')
-    plt.imshow(roi_data['roi_mask'])
+    plt.title(f'Total ROIs: {roi_data_sel["num_rois"]}')
+    plt.imshow(roi_data_sel['roi_mask'])
+
     plt.show()
 
     return roi_data_sel, sel_idxs

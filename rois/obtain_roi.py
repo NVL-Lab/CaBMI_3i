@@ -4,6 +4,39 @@ def get_roi(im, strc_mask, units=None):
     """
     Obtain the activity of each neuron given a spatial filter.
 
+    Im         : 2D numpy array (image)
+    strcMask   : object or dict with neuronMask, maxx, minx, maxy, miny
+    units      : indices of neurons to return (Python-style, 0-based)
+    """
+
+    # MATLAB: if nargin < 3
+    if units is None:
+        units = range(len(strc_mask['neuron_mask']))
+
+    unit_vals = np.zeros(len(units), dtype=float)
+
+    for auxu, u in enumerate(units):
+        posmaxx = strc_mask['maxx'][u]
+        posminx = strc_mask['minx'][u]
+        posmaxy = strc_mask['maxy'][u]
+        posminy = strc_mask['miny'][u]
+
+        # MATLAB: Im(posminy:posmaxy, posminx:posmaxx)
+        # Python slicing is EXCLUSIVE on the end
+        Imd = im[posminy:posmaxy + 1, posminx:posmaxx + 1].astype(float)
+
+        mask = strc_mask['neuron_mask'][u]
+
+        unit_vals[auxu] = np.nansum(
+            Imd * mask / (u + 1) / np.nansum(mask)
+        )
+
+    return unit_vals
+
+def get_roi_misc(im, strc_mask, units=None):
+    """
+    Obtain the activity of each neuron given a spatial filter.
+
     Parameters
     ----------
     im : np.ndarray

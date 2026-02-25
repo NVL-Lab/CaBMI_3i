@@ -54,6 +54,6 @@ def plot_cursor_e1_e2_activity(cursor, e1, e2, n, e_id, e_color, offset=0) -> tu
         ax.plot(y_plot, color=e_color[1])
     
     ax.legend()
-    plt.show()
+    #plt.show()
 
     return fig, offset_vec

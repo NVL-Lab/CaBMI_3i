@@ -21,7 +21,7 @@ def on_cleanup(save_path, bmi_info, task_set):
         if task_set['save']:
             np.savez_compressed(save_path, **bmi_info)
 
-def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None, default_run=False, run=False, sim=False) -> np.ndarray:
+def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None, run=''):
     # base_val_seed are values to add to "initialize the baseline" instead of starting with ones or nans.
     # Save path
     base_name = 'bmi_online'
@@ -30,25 +30,25 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
     relaxation_frames = round(task_set['relaxation_time'] * task_set['im']['frame_rate'])
     print(f'BMI recording will consist of {task_set["bmi_frames"]} frames')
 
-    if not run:
-        if sim:
-            recording_path = path_data['test_dir']
-            print('Simulating bmi...')
-            bdata = bmi_acqnvs_sim_3i(recording_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
-                                      debug_input, fb_bool, fb_cal, strc_info, base_val)
-        else:
-            try:
-                matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
-                bdata = np.load(matches[-1], allow_pickle=True)
-                print(f'Loading {matches[-1].name}')
-            except FileNotFoundError:
-                print('BMI data not found. Please run bmi_acqnvs_3i.')
-                exit(1)
+    if run == 'sim':
+        recording_path = path_data['test_dir']
+        print('Simulating bmi...')
+        bdata = bmi_acqnvs_sim_3i(recording_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
+                                  debug_input, fb_bool, fb_cal, strc_info, base_val)
+        return bdata
+    elif run == 'retrieve':
+        try:
+            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+            bdata = np.load(matches[-1], allow_pickle=True)
+            print(f'Loading {matches[-1].name}')
+        except FileNotFoundError:
+            print('BMI data not found. Please run bmi_acqnvs_3i.')
+            exit(1)
         return bdata
 
     # Creates an instance of slidebook reader
     sb_file_reader, capture = wait_for_reader_with_latest_capture(path_data['sldy_path'])
-    task_set = get_recording_settings(sb_file_reader, capture, task_set, default_run)
+    task_set = get_recording_settings(sb_file_reader, capture, task_set)
     bmi_data_path = path_data['save_path'] / f'{base_name}_{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
     task_set['capture'] = capture
 
@@ -94,24 +94,13 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
         # Flags
         'sched_random_stim': 0,
     }
-    if debug_bool:
-        data.update({
-            'fsmooth': np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float64),
-            'dff'    : np.full((number_neurons, expected_expt_length), np.nan, dtype=np.float64),
-
-            'c1_bool': np.full(expected_expt_length, np.nan, dtype=np.float64),
-            'c2_val' : np.full(expected_expt_length, np.nan, dtype=np.float64),
-            'c2_bool': np.full(expected_expt_length, np.nan, dtype=np.float64),
-            'c3_val' : np.full(expected_expt_length, np.nan, dtype=np.float64),
-            'c3_bool': np.full(expected_expt_length, np.nan, dtype=np.float64)
-        })
 
     trial_flag = True #1
     # TODO: decide the non_buffer_update_counter is worth keeping or not. Don't keep it at 0
     # Nuria explanation: this buffer was to "drop" the first images to avoid artifacts
     # Me: Could be worth dropping
     #: TODO: Nuria changed the following to remove the 0 back to the tset value
-    non_buffer_update_counter = task_set['prefix_win']  # Counter when we don't want to update the buffer
+    non_buffer_update_counter = 0  # Counter when we don't want to update the buffer
     # TODO: Nuria changed this back from the 0 back to the value of the non-buffer-update
     init_frame_base = task_set['prefix_win']
     # Beginning of experiment and VTA stim
@@ -168,21 +157,9 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
                 counter_same += 1
                 continue
 
-            if non_buffer_update_counter > 0:
-                non_buffer_update_counter -= 1 # can probably take out non_buffer
-                print('Moving Frame...')
-                data['frame'] += 1
-                data['time_vector'][data['frame']] = time.perf_counter() - start_time
-                print(f'Execution time: {data["time_vector"][data["frame"]]} seconds')
-                counter_same = 0
-
-                if data['time_vector'][data['frame']] < 1 / (
-                        task_set['im']['frame_rate'] * 1.2):
-                    time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
-
-                elapsed_time = time.perf_counter() - start_time
-                if elapsed_time < frame_interval:
-                    time.sleep(frame_interval - elapsed_time)
+            if non_buffer_update_counter < init_frame_base:
+                non_buffer_update_counter += 1
+                data = move_frame(data, task_set, start_time, frame_interval)
                 continue
 
             temp_time_point = curr_time_point
@@ -310,24 +287,29 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
                 deliver_stim = 0
                 print('stim delivered!')
 
-            print('Moving Frame...')
-            data['frame'] += 1 # should probably move it
-            data['time_vector'][data['frame']] = time.perf_counter() - start_time
-            print(f'Execution time: {data["time_vector"][data["frame"]]} seconds')
-            counter_same = 0
-
-            if data['time_vector'][data['frame']] < 1 / (
-                    task_set['im']['frame_rate'] * 1.2):
-                time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
-
-            elapsed_time = time.perf_counter() - start_time
-            #print(f'Execution time: {elapsed_time} seconds')
-            if elapsed_time < frame_interval:
-                time.sleep(frame_interval - elapsed_time)
+            data = move_frame(data, task_set, start_time, frame_interval)
 
     return bmi_info
 
-def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None) -> np.ndarray:
+def move_frame(data, task_set, start_time, frame_interval):
+    print('Moving Frame...')
+    data['frame'] += 1  # should probably move it
+    data['time_vector'][data['frame']] = time.perf_counter() - start_time
+    print(f'Execution time: {data["time_vector"][data["frame"]]} seconds')
+    counter_same = 0
+
+    if data['time_vector'][data['frame']] < 1 / (
+            task_set['im']['frame_rate'] * 1.2):
+        time.sleep(1 / (task_set['im']['frame_rate'] * 1.2) - data['time_vector'][data['frame']])
+
+    elapsed_time = time.perf_counter() - start_time
+    # print(f'Execution time: {elapsed_time} seconds')
+    if elapsed_time < frame_interval:
+        time.sleep(frame_interval - elapsed_time)
+
+    return data
+
+def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None):
     target_info = loadmat(
         '/Users/saulglopez/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BMI_online190930T152419.mat')
 

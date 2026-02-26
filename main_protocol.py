@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     # Define the type of experiment and run the BMI acquisition
     bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim,
-                             0, [], fb_set['fb_bool'], fb_cal, strc_info, base_val_seed, True, False, True)
+                             0, [], fb_set['fb_bool'], fb_cal, strc_info, base_val_seed, exp_type)
 
     #print(bmi_data)
     #np.savez_compressed('/Users/saulglopez/Downloads/bmi_data.npz', **bmi_data)

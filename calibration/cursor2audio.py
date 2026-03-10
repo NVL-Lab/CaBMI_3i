@@ -17,17 +17,22 @@ def cursor2audio(cursor, fb_cal, fb_cal_settings) -> float:
     float: The calculated auditory feedback frequency.
     """
 
+    if isinstance(fb_cal, np.lib.npyio.NpzFile):
+        cursor_min = fb_cal['cursor_min'].item()
+        cursor_max = fb_cal['cursor_max'].item()
+        fb_cal_settings =  fb_cal_settings.item()
+    else:
+        # If cursor up makes frequency go up
+        cursor_min = fb_cal['cursor_min']
+        cursor_max = fb_cal['cursor_max']
+
     # Handle target to frequency conversion
     # PRONE TO CHANGE!!
     if fb_cal_settings['target_low_freq'] == 1:
         # If cursor up makes frequency go down
         cursor = -cursor
-        cursor_min = -fb_cal['cursor_max']
-        cursor_max = -fb_cal['cursor_min']
-    else:
-        # If cursor up makes frequency go up
-        cursor_min = fb_cal['cursor_min']
-        cursor_max = fb_cal['cursor_max']
+        cursor_min = -cursor_max
+        cursor_max = -cursor_min
 
     # Truncate cursor within the defined range
     cursor_trunc = np.maximum(cursor, cursor_min)

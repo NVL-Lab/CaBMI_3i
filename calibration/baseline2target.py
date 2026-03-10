@@ -47,20 +47,23 @@ def define_fb_calibration(cursor_obs, fbset, t):
 
     return fb_cal
 
-def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range, tset, save_path, fbset, run=False):
+def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range, tset, save_path, fbset):
     fb_cal_name = 'fb_cal'
     cal_all_name = 'target_calibration_all'
     target_info_name = 'bmi_target_info'
-    if run == 'retrieve':
+    strc_info_name = 'strc_info'
+    if tset['expt']['calib']['load']:
         try:
             target_matches = [path for path in save_path.rglob('*') if target_info_name in path.name]
             cal_matches = [path for path in save_path.rglob('*') if cal_all_name in path.name]
             fb_matches = [path for path in save_path.rglob('*') if fb_cal_name in path.name]
+            strc_info_matches = [path for path in save_path.rglob('*') if strc_info_name in path.name]
             target_data = np.load(target_matches[-1], allow_pickle=True)
             cal_data = np.load(cal_matches[-1], allow_pickle=True)
             fb_data = np.load(fb_matches[-1], allow_pickle=True)
-            print(f'Loading {target_matches[-1].name}, {cal_matches[-1].name}, and {fb_matches[-1].name}')
-            return target_data, cal_data, fb_data
+            strc_info = np.load(strc_info_matches[-1], allow_pickle=True)
+            print(f'Loading {target_matches[-1].name}, {cal_matches[-1].name}, {fb_matches[-1].name}, and {strc_info_matches[-1].name}')
+            return target_data, cal_data, fb_data, strc_info
         except FileNotFoundError:
             print('Data not found. Please run baseline2target.')
             exit(1)
@@ -81,7 +84,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     plot_path = save_path / 'plots'
 
     # Create the directory if it does not exist
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plot_path.mkdir(parents=True, exist_ok=True)
 
     # Load data
@@ -117,22 +120,9 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
 
     #ensemble_mask = np.zeros_like(roi_mask)
     ensemble_mask = np.zeros(roi_mask.shape)
-    '''
-    for indn in range(num_e1):
-        auxmask = np.where(roi_mask == e1_base[indn], indn + 1, 0)
-        ensemble_mask += auxmask
-    '''
-
-    for indn in range(num_e1):
-        ensemble_mask[roi_mask == e1_base[indn]] = indn + 1
-
-    '''
-    for indn in range(num_e2):
-        auxmask = np.where(roi_mask == e2_base[indn], indn + num_e1 + 1, 0)
-        ensemble_mask += auxmask
-    '''
-    for indn in range(num_e2):
-        ensemble_mask[roi_mask == e2_base[indn]] = indn + 1
+    neurons = np.concatenate((e1_base, e2_base))
+    for indn in range(len(neurons)):
+        ensemble_mask[roi_mask == neurons[indn]] = indn + 1
 
     strc_mask = get_mask(ensemble_mask)
 
@@ -142,7 +132,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         'e_id': e_id
     }
 
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         np.savez_compressed(save_path / 'strc_info.npz', **strc_info)
 
     decoder, e1_proj, e2_proj, e1_norm, e2_norm = def_decoder(num_neurons, e1_sel, e2_sel)
@@ -189,7 +179,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         ax.set_xlabel('frame')
         ax.set_ylabel('fluorescence')
         ax.set_title('Raw fluorescence in baseline')
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             fig.savefig(save_path/'plots'/'baseline_fraw.png')
         #plt.show()
 
@@ -204,7 +194,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         plt.ylabel('fluorescence')
         plt.title('F0 for one neuron')
         plt.legend()
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             plt.savefig(save_path/'plots'/'f0.png')
         #plt.show()
 
@@ -238,7 +228,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         plt.ylabel('F')
         plt.title('F vs smoothed F')
         plt.legend()
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             plt.savefig(f"{save_path}/plots/f_smooth.png")
         #plt.show()
 
@@ -259,7 +249,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         ax.set_xlabel('frame')
         ax.set_ylabel('dff')
         ax.set_title('dff')
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             fig.savefig(f"{save_path}/plots/dff.png")
         #plt.show()
 
@@ -271,7 +261,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         ax.set_xlabel('frame')
         ax.set_ylabel('dff_z')
         ax.set_title('zscore dff')
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             fig.savefig(f"{save_path}/plots/dffz.png")
         #plt.show()
 
@@ -290,7 +280,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         plt.imshow(analyze_cov, cmap='viridis', aspect='auto')
         plt.colorbar()
         plt.title('Neural Covariance')
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             plt.savefig(f"{save_path}/plots/cov_mat_baseline.png")
 
         # --------------------- PLOT 7 ---------------------
@@ -301,7 +291,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
         plt.xlabel('PC')
         plt.ylabel('Fraction of Variance Explained')
         plt.title('DFF Smooth PCA Covariance')
-        if tset['save']:
+        if tset['expt']['calib']['save']:
             plt.savefig(f"{save_path}/plots/cov_pca_baseline.png")
 
     # Cursor Cov
@@ -418,11 +408,10 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     plt.xlabel('alg iteration')
     plt.ylabel('target')
     plt.title('Target Value over Calibration')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plt.savefig(plot_path / 'target_val_over_calibration.png')
 
     print(f'T: {t}')
-    print('valid hits', valid_hit_idxs)
 
     num_c1 = len(c1)
     print(f'num E2-E1 >= T: {num_c1}')
@@ -457,7 +446,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     plt.xlabel('Cursor E2-E1')
     plt.ylabel('Auditory Freq')
     plt.axvline(x=t, color='r')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plt.savefig(plot_path / 'cursor2freq.png')
 
     fb_obs = cursor2audio(cursor_obs, fb_cal, fb_cal['settings'])
@@ -468,7 +457,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     plt.hist(fb_obs, num_fb_bins)
     plt.xlabel('audio freq')
     plt.ylabel('baseline counts')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plt.savefig(plot_path / 'base_freq_hist.png')
 
     # --------------------- PLOT 11 ---------------------
@@ -486,14 +475,14 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     #plt.axvline(x=valid_hit_idxs, color='r')
     ymin, ymax = plt.ylim()
     plt.vlines(x=valid_hit_idxs, ymin=ymin, ymax=ymax, color='r')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plt.savefig(plot_path / 'cursor_hit_ts.png')
 
     # --------------------- PLOT 12 ---------------------
     offset = 0
     fig, ax = plot_cursor_e1_e2_activity(cursor_obs, e1_mean_analyze, e2_mean_analyze, n_analyze, e_id, e_color, offset)
     plt.axhline(y=t, color='gray', linestyle='--')  # Add threshold line
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         fig.savefig(plot_path / 'cursor_E1_E2_ts.png')
 
     # --------------------- PLOT 13 ---------------------
@@ -511,7 +500,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
     ax.set_title(f'E2-E1 thr on E2-E1 hist, num valid hits: {num_valid_hits} '
                  f'num hits no b2base: {num_hits_no_b2base} '
                  f'num cursor hits: {num_cursor_hits}')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         fig.savefig(f'{plot_path}/cursor_dist_t.png')
 
     psth_win = [-30 * 3, 30 * 3]
@@ -530,19 +519,19 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
 
     plt.xlabel('frame')
     plt.title('PSTH of Baseline Activity Locked to Target Hit')
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         plt.savefig(plot_path / 'psth_locked_to_hit_baseline.png')
 
     date_str = datetime.now().strftime('%Y%m%dT%H%M%S')
     fb_cal_path = save_path / f'fb_cal_{date_str}.npz'
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         np.savez_compressed(fb_cal_path, **fb_cal, allow_pickle=True)
 
     plt.show()
 
     cal_all = {k: v for k, v in locals().items() if not k.startswith('__') and not callable(v)}
     target_cal_all_path = save_path / f'target_calibration_all_{date_str}.npz' # Would save all variables but would need to create a dictionary with all the variables
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         np.savez_compressed(target_cal_all_path, **cal_all, allow_pickle=True)
 
     target_info_path = save_path / f'bmi_target_info_{date_str}.npz'
@@ -569,7 +558,7 @@ def baseline2target(f_base, roi_data, e1_base, e2_base, frames_per_reward_range,
 
     print(f'T {t}')
 
-    if tset['save']:
+    if tset['expt']['calib']['save']:
         np.savez_compressed(target_info_path, **target_info, allow_pickle=True)
 
     return target_info, cal_all, fb_cal, strc_info

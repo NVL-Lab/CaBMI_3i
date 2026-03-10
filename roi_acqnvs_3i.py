@@ -29,15 +29,7 @@ def get_roi_bg(task_set, path_data, run=''):
     roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
     print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
 
-    if run == 'sim':
-        print('Retrieving ROI recording...')
-        roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
-        roi_bg = roi_bg[:task_set['roi']['recording_frames']]
-        if task_set['save']:
-            print(f'Saving ROI background to {roi_bg_path}...')
-            np.save(roi_bg_path, roi_bg, allow_pickle=True)
-        return roi_bg, task_set
-    elif run == 'retrieve':
+    if task_set['expt']['bg']['load']:
         try:
             matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
             roi_bg = np.load(matches[-1], allow_pickle=True)
@@ -45,6 +37,14 @@ def get_roi_bg(task_set, path_data, run=''):
         except FileNotFoundError:
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
+        return roi_bg, task_set
+    elif task_set['expt']['bg']['sim']:
+        print('Retrieving ROI recording...')
+        roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
+        roi_bg = roi_bg[:task_set['roi']['recording_frames']]
+        if task_set['expt']['bg']['save']:
+            print(f'Saving ROI background to {roi_bg_path}...')
+            np.save(roi_bg_path, roi_bg, allow_pickle=True)
         return roi_bg, task_set
 
     # Creates an instance of slidebook reader
@@ -58,7 +58,7 @@ def get_roi_bg(task_set, path_data, run=''):
 def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
     roi_data_path = path_data['save_path'] / 'roi_info.npz'
     # Checks if ROI file already exists
-    if run == 'retrieve':
+    if task_set['expt']['rois']['load']:
         try:
             roi_data = np.load(roi_data_path, allow_pickle=True)
             print(f'Loading {roi_data_path.name}...')
@@ -70,11 +70,8 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
     # Check suite2p's way of creating the mean image and use that method.
     #image_data = np.load('F:cabmi/bmi_test/slidebook/capture_slide.dir/Streamtodisk-1765822852-121.imgdir/ImageData_Ch0_TP0000000.npy')
     # Don't create a mean. Pass to suite2p frame by frame
-
-    #im_raw = np.nanmean(image_data, axis=0)
-    im_raw = image_data
-
-    #print(len(image_data))
+    im_raw = np.nanmean(image_data, axis=0)
+    #im_raw = image_data
 
     # Single image is used to locate ROIs (Old method)
     #im_raw = sb_file_reader.ReadImagePlaneBuf(capture, 0, 0, 0, task_set['im']['chan_data']['green']['fp_idx'], True)
@@ -125,7 +122,7 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
         'roi_data': roi_data
     }
 
-    if task_set['save']:
+    if task_set['expt']['rois']['save']:
         np.savez_compressed(roi_data_path, **roi_info)
 
     return roi_info

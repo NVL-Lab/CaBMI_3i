@@ -8,8 +8,38 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
         'bmi_env': Path('utils/Tseries_BMI_30.env'),
         'save': save,
-        'run': False,
-        'sim': False,
+
+        'expt': {
+            'bg': {
+                'load': True,
+                'sim': False,
+                'save': True,
+            },
+            'rois': {
+                'load': True,
+                'save': True,
+                'plot': False,
+            },
+            'baseline': {
+                'load': True,
+                'sim': True,
+                'save': True,
+            },
+            'calib': {
+                'load': True,
+                'save': True,
+            },
+            'bmi': {
+                'load': False,
+                'sim': True,
+                'save': True,
+            },
+            'behavior': {
+                'load': False,
+                'sim': True,
+                'save': True,
+            },
+        },
 
         # Imaging
         'im': {
@@ -35,7 +65,7 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
         # Calibration
         'cb': {
             'sec_per_reward_range': [70, 50], # [100 70]; [120 90]; [70, 50] a range on how many frames (per sec) should elapse before a reward is expected.  Used to calibrate the target patterns.
-            'baseline_len': 15*60, #10*60,          # Seconds (15*60) #20
+            'baseline_len': 10*60, #10*60,          # Seconds (15*60) #20
             'f0_win_bool': True,      # During cb, if true, estimate f0 with a window of activity.  if false, estimate f0 using the full baseline,
             'dff_win_bool': True,
             'f0_init_slide': False,   # During cb, if 0, f0 is only used after f0_win samples. If 1, f0 is adapted in the window from 0 to f0_win samples.
@@ -62,7 +92,7 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
 
         # Stim Delay
         'delay_flag': 0,
-        'delay_time': 1  # Seconds 
+        'delay_time': 1  # Seconds
     }
 
 '''

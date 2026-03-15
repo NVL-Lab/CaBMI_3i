@@ -39,12 +39,6 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
             print('BMI data not found. Please run bmi_acqnvs_3i.')
             exit(1)
         return bdata
-    elif task_set['expt']['bmi']['sim']:
-        recording_path = path_data['test_dir']
-        print('Simulating bmi...')
-        bdata = bmi_acqnvs_sim_3i(recording_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
-                                  debug_input, fb_bool, fb_cal, strc_info, base_val)
-        return bdata
 
     # Creates an instance of slidebook reader
     sb_file_reader, capture = wait_for_reader_with_latest_capture(path_data['sldy_path'])
@@ -170,7 +164,7 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
             start_time = time.perf_counter()
 
             print('Extracting ROI Mask...')
-            unit_vals = get_roi(image, strc_mask)  # obtain roi values
+            unit_vals = get_roi(image, strc_info['strc_mask'])  # obtain roi values
             data['bmi_act'][:, data['frame']] = unit_vals
 
             fbuffer[:, :-1] = fbuffer[:, 1:]

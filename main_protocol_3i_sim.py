@@ -2,21 +2,22 @@ __author__= 'Saul Gurgua Lopez'
 
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 from params.play_tone import play_tone
 
-from roi_acqnvs_3i import get_roi_bg, get_roi_data
+from roi_acqnvs_3i import get_roi_data
 from params.define_exp_path import get_exp_info
 from params.define_bmi_task_settings import get_bmi_settings
 from params.define_fb_audio_settings import get_fb_settings
 
-from baseline_acqnvs_3i import baseline_acqnvs_3i
+from simulation.baseline_simulation import baseline_acqnvs_sim_3i
 from plots.plot_neurons_baseline import plot_neurons_baseline
 from plots.plot_neurons_ensemble import plot_neurons_ensemble
 from rois.select_roi_data import select_roi_data
 from calibration.baseline2target import baseline2target
 from params.create_vector_random_stim import get_random_stim
-from bmi_acqnvs_3i import bmi_acqnvs_3i
+from simulation.bmi_simulation import bmi_acqnvs_sim_3i
 
 from check_motor_behavior import check_motor_behavior
 
@@ -32,7 +33,7 @@ from simulation.load_mat_files import *
 
 if __name__ == '__main__':
     # Acquire experiment settings
-    exp_info = get_exp_info()
+    exp_info = get_exp_info(exp_type='sim')
     task_set = get_bmi_settings(save=True, prairie=False)
     fb_set = get_fb_settings()
 
@@ -52,10 +53,20 @@ if __name__ == '__main__':
         ROI Acquisition: roi_acqnvs_3i
             Capture the image and input the capture index
     '''
-    roi_bg, task_set = get_roi_bg(task_set, path_data)
+    print('Retrieving ROI recording...')
+    task_set['roi']['recording_frames'] = int(np.ceil(task_set['im']['frame_rate'] * task_set['roi']['recording_len']))
+    roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
+    roi_bg = roi_bg[:task_set['roi']['recording_frames']]
+
+    if task_set['expt']['bg']['save']:
+        base_name = 'roi_bg'
+        roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
+
+        print(f'Saving ROI background to {roi_bg_path}...')
+        np.save(roi_bg_path, roi_bg, allow_pickle=True)
+
     # Should pass the recording to suite2p rather than creating a mean
     roi_info = get_roi_data(roi_bg, path_data, task_set, True)
-
 
     cont = input("Acquire Baseline? [Y/y]")
     if cont == "" or cont.lower() == "y":
@@ -71,13 +82,14 @@ if __name__ == '__main__':
     else:
         roi_data = roi_info['roi_data']
 
+    print('Simulating baseline data...')
     neuron_max = roi_data['num_rois']
-    base_activity, task_set = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'])
+    base_activity, task_set = baseline_acqnvs_sim_3i(roi_data['roi_mask'], task_set, path_data)
     plot_neurons_baseline(base_activity, None, None, neuron_max)
 
     cont = input("Choose ensemble neurons? [Y/y]")
     if cont == "" or cont.lower() == "y":
-        print("Plotting neurons...")
+        print("Select neurons...")
     else:
         print("Stopping...")
         exit(0)
@@ -94,7 +106,7 @@ if __name__ == '__main__':
             if e1_1 == e1_2:
                 print("Neurons must not be the same.")
                 continue
-            e1_base = sorted(np.array([e1_1, e1_2]))
+            e1_base = sorted(np.array([e1_1, e1_2]))  # 14,21
 
             e2_1, e2_2 = map(int,
                              input(f"Ensemble neuron 2 [0 - {neuron_max}] (separate by a space): ").split())
@@ -104,7 +116,7 @@ if __name__ == '__main__':
             if e2_1 == e2_2:
                 print("Neurons must not be the same.")
                 continue
-            e2_base = sorted(np.array([e2_1, e2_2]))
+            e2_base = sorted(np.array([e2_1, e2_2]))  # 20,11
 
             if set(e1_base) & set(e2_base):
                 print("Ensembles must not share neurons")
@@ -113,6 +125,20 @@ if __name__ == '__main__':
             break
         except ValueError:
             print("Please enter exactly two integers separated by a space per ensemble.")
+    # Choose out of the neurons found
+    #e1_base = sorted([23, 15]) #sorted([16, 30])
+    #e2_base = sorted([6, 40]) #sorted([10, 25])
+
+    # subract 1 per roi
+    # E1 [4, 10, 15, 20] => [14, 21, 22, 52] through suite2p
+    # E2 [31, 33, 36, 37] => [20, 11, 26, 46] through suite2p
+
+    #e1_base = sorted(np.array([4, 10, 15, 20])-1)
+    #e2_base = sorted(np.array([31, 33, 36, 37])-1)
+    #e1_base = sorted(np.array([14, 21, 22, 52])-1)
+    #e2_base = sorted(np.array([20, 11, 26, 46])-1)
+    #e1_base = sorted(np.array([14, 21])-1)
+    #e2_base = sorted(np.array([20, 11])-1)
 
     plot_neurons_ensemble(base_activity, e1_base + e2_base, [1] * len(e1_base) + [2] * len(e2_base))
     select_roi_data(roi_data, list(set(e1_base) | set(e2_base)))
@@ -127,6 +153,12 @@ if __name__ == '__main__':
     print('Reward per frame range:')
     print(1. / frames_per_reward_range)
 
+    # Ensure sec_per_reward_range is greater than 80 seconds
+    #if np.any(sec_per_reward_range <= 80):
+    #    raise ValueError("sec_per_reward_range must be higher than 80 seconds to keep the occurrence of artificial vs natural higher than 80%")
+
+    # plot 13 not quite the same
+    # Works now but may want to check on convolution (may just work on even windows)
     target_info, target_cal_all, fb_cal, strc_info = baseline2target(base_activity, roi_data, e1_base, e2_base, frames_per_reward_range, task_set, path_data['save_path'], fb_set)
 
     if isinstance(strc_info, np.lib.npyio.NpzFile):
@@ -134,6 +166,7 @@ if __name__ == '__main__':
     else:
         strc_mask = strc_info['strc_mask']
 
+    # works, but what is the purpose?
     vector_stim, isi = get_random_stim(task_set['im']['frame_rate'], task_set['bmi_len']*task_set['im']['frame_rate'], task_set['rs']['ihsi_mean'], task_set['rs']['ihsi_range'], False)
 
     seed_base = False
@@ -166,9 +199,10 @@ if __name__ == '__main__':
     plt.show()
     '''
 
+    print('Simulating bmi...')
     base_val_seed = np.ones(len(e1_base) + len(e2_base)) * np.nan
-    bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim,
-                             0, [], fb_set['fb_bool'], fb_cal, strc_mask, base_val_seed)
+    bmi_data = bmi_acqnvs_sim_3i(path_data['test_dir'], task_set, path_data, exp_info['expt'], target_info, vector_stim, 0,
+                              [], fb_set['fb_bool'], fb_cal, strc_mask, base_val_seed)
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

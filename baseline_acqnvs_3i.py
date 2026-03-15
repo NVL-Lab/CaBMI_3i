@@ -30,14 +30,6 @@ def baseline_acqnvs_3i(task_set, path_data, roi_mask):
             print('Baseline data not found. Please run baseline_acqnvs_3i.')
             exit(1)
         return base_activity, task_set
-    elif task_set['expt']['bg']['sim']:
-        print('Simulating baseline data...')
-        recording_path = path_data['test_dir']
-        base_activity, task_set = baseline_acqnvs_sim_3i(roi_mask, task_set, recording_path)
-        if task_set['save']:
-            print(f'Saving baseline data to {bdata_path}...')
-            np.save(bdata_path, base_activity, allow_pickle=True)
-        return base_activity, task_set
 
     # Creates an instance of slidebook reader
     sb_file_reader, task_set['cb']['baseline_capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])

@@ -38,14 +38,6 @@ def get_roi_bg(task_set, path_data, run=''):
             print('ROI data not found. Please run roi_acqnvs_3i')
             exit(1)
         return roi_bg, task_set
-    elif task_set['expt']['bg']['sim']:
-        print('Retrieving ROI recording...')
-        roi_bg = np.load(path_data['test_dir'], mmap_mode='r', allow_pickle=True)
-        roi_bg = roi_bg[:task_set['roi']['recording_frames']]
-        if task_set['expt']['bg']['save']:
-            print(f'Saving ROI background to {roi_bg_path}...')
-            np.save(roi_bg_path, roi_bg, allow_pickle=True)
-        return roi_bg, task_set
 
     # Creates an instance of slidebook reader
     sb_file_reader, task_set['roi']['capture'] = wait_for_reader_with_latest_capture(path_data['sldy_path'])

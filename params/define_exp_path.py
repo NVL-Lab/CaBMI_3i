@@ -5,7 +5,7 @@ def get_exp_info(exp_type: str = '') -> dict:
     exp_info = {
         'animal': 'mouse0',  # ago23
         'day': 'D0',  # DF
-        'date': 260124, #datetime.today().strftime('%y%m%d'),
+        'date': datetime.today().strftime('%y%m%d'), #260124
         'expt': 'bmi_stim'  # bmi_stim
     }
 

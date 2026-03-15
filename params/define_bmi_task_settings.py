@@ -2,8 +2,11 @@ from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: str = '') -> Dict:
-    #fr = 29.752 # Prairie
+def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: str = 'R PMT', prairie: bool = False, save: bool = False) -> Dict:
+    if prairie:
+        fr = 29.752
+        res = (512, 512)
+
     return {
         'baseline_env': Path('utils/Tseries_baseline_15.env'),
         'bmi_env': Path('utils/Tseries_BMI_30.env'),
@@ -12,7 +15,6 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
         'expt': {
             'bg': {
                 'load': True,
-                'sim': False,
                 'save': True,
             },
             'rois': {
@@ -22,7 +24,6 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
             },
             'baseline': {
                 'load': True,
-                'sim': True,
                 'save': True,
             },
             'calib': {
@@ -31,12 +32,10 @@ def get_bmi_settings(save: bool = False, fr: float = 38.6, res: Tuple[int, int] 
             },
             'bmi': {
                 'load': False,
-                'sim': True,
                 'save': True,
             },
             'behavior': {
                 'load': False,
-                'sim': True,
                 'save': True,
             },
         },

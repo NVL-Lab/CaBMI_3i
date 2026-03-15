@@ -33,7 +33,7 @@ from simulation.load_mat_files import *
 if __name__ == '__main__':
     # Acquire experiment settings
     exp_info = get_exp_info()
-    task_set = get_bmi_settings(save=True, prairie=False)
+    task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
 
     # Storing path and environment data
@@ -42,7 +42,6 @@ if __name__ == '__main__':
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
         'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}").expanduser().resolve(),
-        'test_dir': Path(exp_info['recording_onedrive_mac_dir'])
     }
     if task_set['save']:
         path_data['save_path'].mkdir(parents=True, exist_ok=True)

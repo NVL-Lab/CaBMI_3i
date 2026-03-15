@@ -8,7 +8,7 @@ from params.play_tone import play_tone
 
 from roi_acqnvs_3i import get_roi_data
 from params.define_exp_path import get_exp_info
-from params.define_bmi_task_settings import get_bmi_settings
+from params.define_bmi_task_settings import get_bmi_3i_sim_settings
 from params.define_fb_audio_settings import get_fb_settings
 
 from simulation.baseline_simulation import baseline_acqnvs_sim_3i
@@ -34,7 +34,7 @@ from simulation.load_mat_files import *
 if __name__ == '__main__':
     # Acquire experiment settings
     exp_info = get_exp_info(exp_type='sim')
-    task_set = get_bmi_settings(save=True, prairie=False)
+    task_set = get_bmi_3i_sim_settings(save=True)
     fb_set = get_fb_settings()
 
     # Storing path and environment data

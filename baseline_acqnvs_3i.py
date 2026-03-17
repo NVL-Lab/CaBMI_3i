@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from wait_on_task_3i import *
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from params.play_tone import play_tone
-from recording_acqnvs_3i import recording_acqnvs_3i, baseline_acqnvs_sim_3i
+from recording_acqnvs_3i import recording_acqnvs_3i
 
 def baseline_acqnvs_3i(task_set, path_data, roi_mask):
     # Save path

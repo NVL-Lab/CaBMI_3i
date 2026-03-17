@@ -72,7 +72,7 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
         },
 
         # BMI
-        'bmi_len': 30*60, # Seconds (30x60) (10*60)
+        'bmi_len': 10*60, # Seconds (30x60) (10*60)
         'prefix_win': 40, # skip the first 40
         'f0_win': 1*60*math.ceil(fr),
         'dff_win': 10, # dff is calculated with last n frames

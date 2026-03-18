@@ -8,21 +8,21 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
 
         'expt': {
             'bg': {
-                'load': False,
+                'load': True,
                 'save': True,
             },
             'rois': {
-                'load': False,
+                'load': True,
                 'save': True,
                 'plot': True,
             },
             'baseline': {
-                'load': False,
+                'load': True,
                 'save': True,
             },
             'calib': {
                 'load': False,
-                'save': True,
+                'save': False,
             },
             'bmi': {
                 'load': False,
@@ -57,6 +57,8 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
 
         # Calibration
         'cb': {
+            'ensemble_count': 2,
+            'neurons_per_ensemble': 2,
             'sec_per_reward_range': [70, 50], # [100 70]; [120 90]; [70, 50] a range on how many frames (per sec) should elapse before a reward is expected.  Used to calibrate the target patterns.
             'baseline_len': 10*60, #10*60,          # Seconds (15*60) #20
             'f0_win_bool': True,      # During cb, if true, estimate f0 with a window of activity.  if false, estimate f0 using the full baseline,

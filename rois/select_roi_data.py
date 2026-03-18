@@ -1,6 +1,30 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def get_neuron_ensemble(neuron_max, count):
+    while True:
+        try:
+            rois = list(map(int, input(
+                f"Enter {count} integers [0–{neuron_max}] separated by spaces: "
+            ).split()))
+
+            if len(rois) != count:
+                print(f"Please enter exactly {count} integers.")
+                continue
+
+            if any(v < 0 or v > neuron_max for v in rois):
+                print("All neurons must be within the allowed range.")
+                continue
+
+            if len(set(rois)) != len(rois):
+                print("Neurons must not repeat within the same ensemble.")
+                continue
+
+            return sorted(rois)
+
+        except ValueError:
+            print("Please enter valid integers.")
+
 def select_roi_data(roi_data, sel_idxs):
     sel_idxs = np.unique(sel_idxs)
     roi_data_sel = {}

@@ -1,9 +1,7 @@
 from datetime import datetime
 from contextlib import contextmanager
 from typing import Optional
-from pathlib import Path
-
-from scipy.io import loadmat
+import serial
 
 from wait_on_task_3i import *
 from rois.obtain_roi import get_roi
@@ -21,7 +19,7 @@ def on_cleanup(save_path, bmi_info, task_set):
         if task_set['expt']['bmi']['save']:
             np.savez_compressed(save_path, **bmi_info)
 
-def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, base_val: Optional[np.ndarray]=None, run=''):
+def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_info, a, base_val: Optional[np.ndarray]=None, run=''):
     # base_val_seed are values to add to "initialize the baseline" instead of starting with ones or nans.
     # Save path
     base_name = 'bmi_online'
@@ -133,6 +131,7 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
     time.sleep(1)
     a.write_digital("D9", 0)
     '''
+    a.write(b'1')
 
     print('STARTING RECORDING!!!')
     print('baseBuffer filling!...')
@@ -244,8 +243,7 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
 
                                 print('Target Achieved! (self-target)')
 
-                                if not debug_bool:
-                                    print('RewardTone delivery!')
+                                print('RewardTone delivery!')
                                 buffer_update_counter = relaxation_frames
                                 back2baseline_flag = True
                                 trial_flag = True
@@ -267,6 +265,7 @@ def bmi_acqnvs_3i(task_set, path_data, expt_str, bdata, vector_stim, debug_bool,
                 time.sleep(1)
                 a.write_digital("D9", 0)
                 '''
+                a.write(b'1')
                 deliver_water = 0
                 print('water delivered!')
 

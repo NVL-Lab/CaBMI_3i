@@ -26,7 +26,8 @@ def get_fb_settings(tlf=True, fmin=6000, fmax=19000) -> dict:
         'trunc_freq_non_target':tfnt,
         'trunc_freq_E1_state': tfe1s,
         'arduino':{
-            'com': 'COM15',
+            'com': 'COM11', #'COM15'
+            'baudrate': 115200,
             'label': 'Uno',     # Might not be necessary in Python arduino module
             'pin': 'D11',
             'duration': 0.3     # ms, tones update at rate of BMI code, this is the longest a tone will play for

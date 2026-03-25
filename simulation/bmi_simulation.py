@@ -8,7 +8,7 @@ from calibration.cursor2audio import cursor2audio
 from rois.obtain_roi import get_roi
 from expt2bmi_flags import get_flags
 
-def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_mask, base_val: Optional[np.ndarray]=None):
+def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_stim, debug_bool, debug_input, fb_bool, fb_cal, strc_mask, a, base_val: Optional[np.ndarray]=None):
     #target_info = loadmat(
     #    '/Users/saulglopez/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BMI_online190930T152419.mat')
 
@@ -106,6 +106,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
     time.sleep(1)
     a.write_digital("D9", 0)
     '''
+    a.write(b'1')
 
     bmi_data_path = path_data['save_path'] / f'bmi_online_{datetime.now().strftime("%y%m%dT%H%M%S")}.npz'
     bmi_info = {}
@@ -241,6 +242,7 @@ def bmi_acqnvs_sim_3i(bmi_path, task_set, path_data, expt_str, bdata, vector_sti
             time.sleep(1)
             a.write_digital("D9", 0)
             '''
+            a.write(b'1')
             deliver_water = 0
             print('water delivered!')
 

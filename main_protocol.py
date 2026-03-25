@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from params.play_tone import play_tone
+import serial
 
 from roi_acqnvs_3i import get_roi_bg, get_roi_data
 from params.define_exp_path import get_exp_info
@@ -35,6 +36,8 @@ if __name__ == '__main__':
     exp_info = get_exp_info()
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
+    # Check if arduino is available, else return none maybe
+    a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
 
     # Storing path and environment data
     path_data = {
@@ -161,7 +164,7 @@ if __name__ == '__main__':
 
     base_val_seed = np.ones(len(neuron_ensembles[0]) + len(neuron_ensembles[1])) * np.nan
     bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim,
-                             0, [], fb_set['fb_bool'], fb_cal, strc_mask, base_val_seed)
+                             0, [], fb_set['fb_bool'], fb_cal, strc_mask, a, base_val_seed)
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)

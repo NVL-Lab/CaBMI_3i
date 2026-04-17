@@ -4,7 +4,7 @@ from wait_on_task_3i import *
 from rois.scale_im_interactive import scale_im_interactive
 from rois.label_mask2roi_data_single_channel import label_mask2roi_data_single_channel
 from rois.obtain_roi_mask_suite2p import get_roi_mask
-from recording_acqnvs_3i import recording_acqnvs_3i
+from recording_acqnvs_3i import recording_acqnvs_3i, recording_acqnvs_3i_sbaccess
 
 from pathlib import Path
 
@@ -46,6 +46,45 @@ def get_roi_bg(task_set, path_data, run=''):
     roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
     return recording_acqnvs_3i(roi_bg, task_set['roi']['recording_frames'], task_set, sb_file_reader, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
+
+
+def get_roi_bg_sbaccess(task_set, path_data, sb_access):
+    """
+        Records region of interest and extracts the regions of interest (ROIs)
+
+        Parameters:
+            task_set: dictionary with bmi parameters
+            path_data: paths to experiment data
+            capture: integer denoting the desired capture within 3i .sldy file
+            channel: type of channel
+            roi_chan_data: list with channel and ROI data
+            see_roi_data_flag: bool used to determine if ROIs should be plotted
+            run: bool used to determine if the code should be run (typically ran unless code has been ran already)
+
+        Returns:
+            test_info: dictionary containing dataframes with voltage data.
+    """
+    base_name = 'roi_bg'
+    task_set['roi']['recording_frames'] = int(np.ceil(task_set['im']['frame_rate'] * task_set['roi']['recording_len'])) # Actual microscope fps seems to be halved
+    roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
+    print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
+
+    if task_set['expt']['bg']['load']:
+        try:
+            matches = [path for path in path_data['save_path'].rglob('*') if base_name in path.name]
+            roi_bg = np.load(matches[-1], allow_pickle=True)
+            print(f'Loading {matches[-1].name}...')
+        except FileNotFoundError:
+            print('ROI data not found. Please run roi_acqnvs_3i')
+            exit(1)
+        return roi_bg, task_set
+
+    roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung') #StartStream
+    task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
+
+    roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+
+    return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
 def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
     roi_data_path = path_data['save_path'] / 'roi_info.npz'

@@ -1,0 +1,3 @@
+[submodule "slidebook"]
+	path = slidebook
+	url = https://github.com/3i-microscopes/SBReadFile22-Python.git

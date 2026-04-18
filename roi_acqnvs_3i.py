@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import socket
+from slidebook.SBAccess import *
 
 from wait_on_task_3i import *
 from rois.scale_im_interactive import scale_im_interactive
@@ -79,12 +81,89 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
             exit(1)
         return roi_bg, task_set
 
-    roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung') #StartStream
-    task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
+    #task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
 
-    roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+    #roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
 
-    return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
+    #return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
+
+    expt_info = {'type': 'default'}
+    #channel = task_set['im']['chan_data']['recording_chan']
+    channel = 0
+    frame_counter = 0
+    counter_same = 0
+    temp_time_point = 0
+    prev_tp = -1
+    frame_interval = 1 / (task_set['im']['frame_rate'] * 1.2)
+    #plane_count = sb_access.GetNumZPlanes(capture)
+    #z_plane = int(plane_count / 2)
+    total_process_time = 0
+    frame_limit = 1000
+
+    if expt_info['type'] == 'baseline':
+        save = task_set['expt']['baseline']['save']
+    else:
+        save = task_set['expt']['bg']['save']
+
+    HOST = 'DESKTOP-M1BJH7O'  # The server's hostname or IP address
+    PORT = 65432
+    print('STARTING RECORDING!!!')
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
+        s.connect((HOST, PORT))
+        sb_access = SBAccess(s)
+        #capture = sb_access.StartCapture('ROI_backgroung')
+        capture = sb_access.StartStreaming()
+        im_name = sb_access.GetImageName(capture)
+        plane_count = sb_access.GetNumZPlanes(capture)
+        z_plane = int(plane_count / 2)
+        print(f'The image name for capture {capture} is {im_name}')
+        while sb_access.IsCapturing():
+            # Stops recording when buffer is full
+            if frame_counter >= frame_limit:
+                sb_access.StopCapture()
+                break
+
+            curr_tp = sb_access.GetNumTimepoints(capture)  # Lost curr_time_point-1 frames
+            latest_tp = sb_access.GetLastImageCaptured(capture)
+            print(curr_tp)
+            print(latest_tp)
+
+            print(f'*** Time Point: {latest_tp}')
+            # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
+            image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
+                                                task_set['im']['chan_data'][channel],
+                                                True)
+            if latest_tp == prev_tp:
+                continue
+
+            start_time = time.perf_counter()
+            if expt_info['type'] == 'baseline':
+                print('home')
+                # Store ROI data
+                #unit_vals = get_roi(image, expt_info['strc_mask'])
+                #image_data[:, frame_counter] = unit_vals
+            else:
+                print('hi')
+                # Store frame data
+                #image_data[frame_counter] = image
+
+            frame_counter += 1
+            print(f'*** Frames captured: {frame_counter}')
+
+            elapsed_time = time.perf_counter() - start_time
+            total_process_time += elapsed_time
+            print(f'Execution time: {elapsed_time} seconds')
+
+            if elapsed_time < frame_interval:
+                time.sleep(frame_interval - elapsed_time)
+
+            prev_tp = latest_tp
+            # if latest_tp == tp_count-1 :
+            #    break
+
+    print('Total processing time: {:.2f} seconds'.format(total_process_time))
+    #return image_data, task_set
+    return
 
 def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
     roi_data_path = path_data['save_path'] / 'roi_info.npz'

@@ -4,12 +4,15 @@ import math
 
 def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: str = 'R PMT', save: bool = False) -> Dict:
     return {
+        'HOST': 'DESKTOP-M1BJH7O',  # The server's hostname or IP address
+        'PORT': 65432,  # Port to listen on (non-privileged ports are > 1023)
+
         'save': save,
 
         'expt': {
             'bg': {
-                'load': True,
-                'save': True,
+                'load': False,
+                'save': False,
             },
             'rois': {
                 'load': True,

@@ -1,6 +1,7 @@
 import numpy as np
 from contextlib import contextmanager
 import time
+import socket
 
 from rois.obtain_strc_mask_from_mask import obtain_strc_mask_from_mask
 from rois.obtain_roi import get_roi
@@ -46,9 +47,10 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
         save = task_set['expt']['bg']['save']
 
     print('STARTING RECORDING!!!')
-    with on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: #on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
         im_name = sb_access.GetImageName(capture)
         print(f'The image name for capture {capture} is {im_name}')
+        roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung')
         while sb_access.IsCapturing():
             # Stops recording when buffer is full
             if frame_counter >= frame_limit:

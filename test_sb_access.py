@@ -40,7 +40,7 @@ def main():
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
     # Check if arduino is available, else return none maybe
-    a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
+    #a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
 
     # Storing path and environment data
     path_data = {
@@ -52,20 +52,12 @@ def main():
     print('\nData Paths:\n', path_data, '\n')
 
     # Open one slide that will be for the entire experiment
-    HOST = 'DESKTOP-M1BJH7O'  # The server's hostname or IP address
-    PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
-
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((HOST, PORT))
+        s.connect((task_set['HOST'], task_set['PORT']))
         sb_access = SBAccess(s)
 
         slide_id = sb_access.CreateNewSlide()
-
-        if sb_access.SetTargetSlide(slide_id) == 1:
-            print('Created: ', slide_id)
-        else:
-            print('Failed to create slide: ', slide_id)
-            exit(1)
+        sb_access.SetTargetSlide(slide_id)
 
     '''
         ROI Acquisition: roi_acqnvs_3i

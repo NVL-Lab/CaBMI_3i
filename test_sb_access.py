@@ -52,12 +52,23 @@ def main():
     print('\nData Paths:\n', path_data, '\n')
 
     # Open one slide that will be for the entire experiment
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((task_set['HOST'], task_set['PORT']))
-        sb_access = SBAccess(s)
+    #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    #    s.connect((task_set['HOST'], task_set['PORT']))
+    #    sb_access = SBAccess(s)
 
-        slide_id = sb_access.CreateNewSlide()
-        sb_access.SetTargetSlide(slide_id)
+    #    slide_id = sb_access.CreateNewSlide()
+    #    sb_access.SetTargetSlide(slide_id)
+
+    # Should create new slides per different day of experiment per mouse
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((task_set['HOST'], task_set['PORT']))
+    sb_access = SBAccess(s)
+    slide_id = sb_access.CreateNewSlide() # Always 1
+    sb_access.SetTargetSlide(slide_id)
+    #sb_access.SaveAsSlide(slide_id, r'F:\sbaccess') # access denied
+    #sb_access.SaveSlide(slide_id) # Cannot save slide
+    #Crashes when using with statement which closes socket i think
+    # Should find out how to remove the save slide warning
 
     '''
         ROI Acquisition: roi_acqnvs_3i
@@ -71,13 +82,9 @@ def main():
         exit(0)
 
     roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
+    s.close()
     # Should pass the recording to suite2p rather than creating a mean
     roi_info = get_roi_data(roi_bg, path_data, task_set, True)
-
-    x = sb_access.GetXPosition(0, 0)
-    y = sb_access.GetYPosition(0, 0)
-    z = sb_access.GetZPosition(0, 0, 0)
-    print(x, y, z)
     exit()
 
     cont = input("Acquire Baseline? [Y/y] ")

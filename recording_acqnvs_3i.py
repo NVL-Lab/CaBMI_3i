@@ -18,7 +18,7 @@ def on_cleanup(image_path, image_data, save):
         if save:
             np.save(image_path, image_data, allow_pickle=True)
 
-def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, image_path, capture, expt_info):
+def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, image_path, expt_info):
     """
         Records region of interest and extracts the regions of interest (ROIs)
 
@@ -33,12 +33,8 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     """
     channel = task_set['im']['chan_data']['recording_chan']
     frame_counter = 0
-    counter_same = 0
-    temp_time_point = 0
     prev_tp = -1
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
-    plane_count = sb_access.GetNumZPlanes(capture)
-    z_plane = int(plane_count / 2)
     total_process_time = 0
 
     if expt_info['type'] == 'baseline':
@@ -47,52 +43,71 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
         save = task_set['expt']['bg']['save']
 
     print('STARTING RECORDING!!!')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: #on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
-        im_name = sb_access.GetImageName(capture)
-        print(f'The image name for capture {capture} is {im_name}')
-        roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung')
-        while sb_access.IsCapturing():
-            # Stops recording when buffer is full
-            if frame_counter >= frame_limit:
-                sb_access.StopCapture()
-                break
+    #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: #on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
+    roi_bg_streaming_id = sb_access.StartStreaming()  # Always 32768
+    # roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung')
+    '''
+    # May need to save it in order to get info
+    capture = sb_access.GetNumCaptures() - 1  # I need to create another slide. Any open slides will not be recognized
+    positions = sb_access.GetNumPositions(capture) - 1  # What are positions
+    im_name = sb_access.GetImageName(capture)
+    plane_count = sb_access.GetNumZPlanes(capture)
+    z_plane = int(plane_count / 2)
+    
+    
+    print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id}) is {im_name}')
+    y = sb_access.GetXPosition(capture, positions)  # Y in sutter
+    x = sb_access.GetYPosition(capture, positions)  # X in sutter
+    z = sb_access.GetZPosition(capture, positions, z_plane)
+    print(x, y, z)
+    '''
+    capture = 0
+    z_plane = 0
+    print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id})')
+    while sb_access.IsStreaming():
+        # Stops recording when buffer is full
+        if frame_counter >= frame_limit:
+            sb_access.StopCapture()
+            break
 
-            curr_tp = sb_access.GetNumTimepoints(capture) # Lost curr_time_point-1 frames
-            latest_tp = sb_access.GetLastImageCaptured(capture)
-            print(curr_tp)
-            print(latest_tp)
+        curr_tp = sb_access.GetNumTimepoints(capture) # Lost curr_time_point-1 frames
+        latest_tp = sb_access.GetLastImageCaptured(capture)
+        print(curr_tp)
+        print(latest_tp)
 
-            print(f'*** Time Point: {latest_tp}')
-            # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-            image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
-                                                     task_set['im']['chan_data'][channel],
-                                                     True)
-            if latest_tp == prev_tp:
-                continue
+        print(f'*** Time Point: {latest_tp}')
+        # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
+        #image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
+                                                 #task_set['im']['chan_data'][channel],
+                                                 #True)
+        image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
+                                            0,
+                                            True)
+        if latest_tp == prev_tp:
+            continue
 
-            start_time = time.perf_counter()
-            if expt_info['type'] == 'baseline':
-                # Store ROI data
-                unit_vals = get_roi(image, expt_info['strc_mask'])
-                image_data[:, frame_counter] = unit_vals
-            else:
-                # Store frame data
-                image_data[frame_counter] = image
+        start_time = time.perf_counter()
+        if expt_info['type'] == 'baseline':
+            # Store ROI data
+            unit_vals = get_roi(image, expt_info['strc_mask'])
+            image_data[:, frame_counter] = unit_vals
+        else:
+            # Store frame data
+            image_data[frame_counter] = image
 
-            frame_counter += 1
-            print(f'*** Frames captured: {frame_counter}')
+        frame_counter += 1
+        print(f'*** Frames captured: {frame_counter}')
 
-            elapsed_time = time.perf_counter() - start_time
-            total_process_time += elapsed_time
-            print(f'Execution time: {elapsed_time} seconds')
+        elapsed_time = time.perf_counter() - start_time
+        total_process_time += elapsed_time
+        print(f'Execution time: {elapsed_time} seconds')
 
-            if elapsed_time < frame_interval:
-                time.sleep(frame_interval - elapsed_time)
+        if elapsed_time < frame_interval:
+            time.sleep(frame_interval - elapsed_time)
 
-            prev_tp = latest_tp
-            #if latest_tp == tp_count-1 :
-            #    break
-
+        prev_tp = latest_tp
+        #if latest_tp == tp_count-1 :
+        #    break
     print('Total processing time: {:.2f} seconds'.format(total_process_time))
     return image_data, task_set
 

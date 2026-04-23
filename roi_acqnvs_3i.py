@@ -87,7 +87,9 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
     #print(sb_access.GetNumYRows(capture)) #386
     #print(sb_access.GetNumZPlanes(capture))
     #roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
-    roi_bg = np.full((100, 386, 400), np.nan)
+    task_set['roi']['recording_frames'] = 100
+    #roi_bg = np.full((task_set['roi']['recording_frames'], 386, 400), np.nan)
+    roi_bg = np.full((task_set['roi']['recording_frames'], 386*400), np.nan)
 
     return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, {'type': 'default'})
 

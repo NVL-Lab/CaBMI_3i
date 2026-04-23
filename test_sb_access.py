@@ -51,14 +51,6 @@ def main():
         path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
-    # Open one slide that will be for the entire experiment
-    #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #    s.connect((task_set['HOST'], task_set['PORT']))
-    #    sb_access = SBAccess(s)
-
-    #    slide_id = sb_access.CreateNewSlide()
-    #    sb_access.SetTargetSlide(slide_id)
-
     # Should create new slides per different day of experiment per mouse
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((task_set['HOST'], task_set['PORT']))
@@ -67,7 +59,6 @@ def main():
     sb_access.SetTargetSlide(slide_id)
     #sb_access.SaveAsSlide(slide_id, r'F:\sbaccess') # access denied
     #sb_access.SaveSlide(slide_id) # Cannot save slide
-    #Crashes when using with statement which closes socket i think
     # Should find out how to remove the save slide warning
 
     '''

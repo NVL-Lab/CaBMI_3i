@@ -15,8 +15,8 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
                 'save': False,
             },
             'rois': {
-                'load': True,
-                'save': True,
+                'load': False,
+                'save': False,
                 'plot': True,
             },
             'baseline': {

@@ -72,13 +72,11 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
 
         # Wait for the first image gathered to continue
         while True:
-            #latest_tp = sb_access.GetLastImageStreamed(capture) #
             #latest_tp = sb_access.GetNumTimepoints(capture) # Not like lastimagestreamed, may take longer
-            latest_tp = sb_access.GetLastImageStreamed(capture) # Seems to skip - correct amount of frames but all are not captured
-            print(latest_tp)
+            # Currently only misses two (maybe 1) frame
+            latest_tp = sb_access.GetLastImageStreamed(capture) # Is the index the actual position ot should i subtract one
             if latest_tp >= 0 and latest_tp != prev_tp:
                 break
-
 
         # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
         #image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
@@ -87,17 +85,15 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
         image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp, z_plane, 0) # No option for 2D array
 
         print(f'*** Time Point: {latest_tp}')
-        #if latest_tp == prev_tp:
-        #    continue
 
         start_time = time.perf_counter()
         if expt_info['type'] == 'baseline':
             # Store ROI data
             unit_vals = get_roi(image, expt_info['strc_mask'])
             image_data[:, frame_counter] = unit_vals
-        #else:
+        else:
             # Store frame data
-            #image_data[frame_counter] = image
+            image_data[frame_counter] = image
 
         frame_counter += 1
         print(f'*** Frames captured: {frame_counter}')
@@ -106,12 +102,12 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
         total_process_time += elapsed_time
         print(f'Execution time: {elapsed_time} seconds')
 
+
         if elapsed_time < frame_interval:
             time.sleep(frame_interval - elapsed_time)
 
         prev_tp = latest_tp
-        #if latest_tp == tp_count-1 :
-        #    break
+
     print('Total processing time: {:.2f} seconds'.format(total_process_time))
     return image_data, task_set
 

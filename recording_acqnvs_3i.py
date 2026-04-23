@@ -44,7 +44,8 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
 
     print('STARTING RECORDING!!!')
     #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: #on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
-    roi_bg_streaming_id = sb_access.StartStreaming()  # Always 32768
+    #roi_bg_streaming_id = sb_access.StartStreaming()  # Always 32768
+    capture = sb_access.StartStreaming()  # Always 32768
     # roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung')
     '''
     # May need to save it in order to get info
@@ -61,28 +62,32 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     z = sb_access.GetZPosition(capture, positions, z_plane)
     print(x, y, z)
     '''
-    capture = 0
+    #capture = 0
     z_plane = 0
-    print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id})')
+    #print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id})')
+    print(f'The image name for capture {capture}')
     while sb_access.IsStreaming():
         # Stops recording when buffer is full
         if frame_counter >= frame_limit:
-            sb_access.StopCapture()
+            sb_access.StopStreaming() # not working
             break
 
-        curr_tp = sb_access.GetNumTimepoints(capture) # Lost curr_time_point-1 frames
-        latest_tp = sb_access.GetLastImageCaptured(capture)
-        print(curr_tp)
-        print(latest_tp)
+        # Wait for the first image gathered to continue
+        while True:
+            #latest_tp = sb_access.GetLastImageStreamed(capture) #
+            #latest_tp = sb_access.GetNumTimepoints(capture) # Not like lastimagestreamed, may take longer
+            latest_tp = sb_access.GetLastImageStreamed(capture) # Seems to skip - correct amount of frames but all are not captured
+            if latest_tp >= 0:
+                break
 
-        print(f'*** Time Point: {latest_tp}')
+
         # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
         #image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
                                                  #task_set['im']['chan_data'][channel],
                                                  #True)
-        image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
-                                            0,
-                                            True)
+        image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp, z_plane, 0) # No option for 2D array
+
+        print(f'*** Time Point: {latest_tp}')
         if latest_tp == prev_tp:
             continue
 
@@ -91,9 +96,9 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
             # Store ROI data
             unit_vals = get_roi(image, expt_info['strc_mask'])
             image_data[:, frame_counter] = unit_vals
-        else:
+        #else:
             # Store frame data
-            image_data[frame_counter] = image
+            #image_data[frame_counter] = image
 
         frame_counter += 1
         print(f'*** Frames captured: {frame_counter}')

@@ -697,19 +697,72 @@ class CaBMIConfigGUI(tk.Tk):
     def save_session_config(self):
         try:
             config = self.build_current_session_config()
+        except Exception as e:
+            messagebox.showerror("Cannot build session config", str(e))
+            return
+
+        overwrite = False
+        session_id = config["session_id"]
+
+        if self.cm.session_exists(self.user_var.get(), self.project_var.get(), session_id):
+            answer = messagebox.askyesnocancel(
+                "Session already exists",
+                (
+                    f"This session already exists:\n\n"
+                    f"{session_id}\n\n"
+                    "Yes = overwrite existing session_config.json\n"
+                    "No = cancel so you can change the day/session label\n"
+                    "Cancel = cancel"
+                ),
+            )
+            if answer is True:
+                overwrite = True
+            else:
+                self.log(f"Save cancelled because session already exists: {session_id}")
+                return
+
+        try:
             path = self.cm.save_session_config(
                 user_name=self.user_var.get(),
                 project_name=self.project_var.get(),
                 session_config=config,
                 save_base_dir=Path(self.save_base_dir_var.get()),
                 register=True,
+                overwrite=overwrite,
             )
+        except FileExistsError as e:
+            answer = messagebox.askyesno(
+                "File already exists",
+                f"{e}\n\nOverwrite the existing file?"
+            )
+            if not answer:
+                self.log("Save cancelled because file already exists.")
+                return
+
+            try:
+                path = self.cm.save_session_config(
+                    user_name=self.user_var.get(),
+                    project_name=self.project_var.get(),
+                    session_config=config,
+                    save_base_dir=Path(self.save_base_dir_var.get()),
+                    register=True,
+                    overwrite=True,
+                )
+            except Exception as e2:
+                messagebox.showerror("Save failed", str(e2))
+                return
+
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
             return
 
-        messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
-        self.log(f"Saved session config: {path}")
+        if overwrite:
+            messagebox.showinfo("Session overwritten", f"Overwrote session config:\n{path}")
+            self.log(f"Overwrote session config: {path}")
+        else:
+            messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
+            self.log(f"Saved session config: {path}")
+
         self.refresh_suggested_day()
 
     # ------------------------------------------------------------------

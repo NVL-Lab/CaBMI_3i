@@ -747,6 +747,18 @@ class ConfigManager:
 
         return config
 
+    def session_exists(
+        self,
+        user_name: str,
+        project_name: str,
+        session_id: str,
+    ) -> bool:
+        """
+        Return True if a session_id already exists in sessions.json.
+        """
+        sessions = self.list_sessions(user_name, project_name)
+        return any(session.get("session_id") == session_id for session in sessions)
+
     def register_session(
         self,
         user_name: str,
@@ -784,6 +796,7 @@ class ConfigManager:
         session_config: dict[str, Any],
         save_base_dir: Path,
         register: bool = True,
+        overwrite: bool = False,
     ) -> Path:
         """
         Save the exact session config next to the future data.
@@ -799,14 +812,25 @@ class ConfigManager:
         session_date = session_config["date"]
         day = session_config["day"]
 
+        session_id = session_config["session_id"]
         session_dir = save_base_dir / project / animal_id / experiment / session_date / day
-        session_dir.mkdir(parents=True, exist_ok=True)
-
         path = session_dir / "session_config.json"
+
+        if register and self.session_exists(user_name, project_name, session_id) and not overwrite:
+            raise ValueError(
+                f"Session '{session_id}' already exists. Use overwrite=True to overwrite it."
+            )
+
+        if path.exists() and not overwrite:
+            raise FileExistsError(
+                f"Session config file already exists: {path}. Use overwrite=True to overwrite it."
+            )
+
+        session_dir.mkdir(parents=True, exist_ok=True)
         _write_json(path, session_config)
 
         if register:
-            self.register_session(user_name, project_name, session_config)
+            self.register_session(user_name, project_name, session_config, overwrite=overwrite)
 
         return path
 

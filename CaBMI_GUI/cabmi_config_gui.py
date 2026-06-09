@@ -112,7 +112,7 @@ DEFAULT_EXPERIMENT_TEMPLATE = {
 
 CAPABILITY_LABELS = {
     "cabmi": "CaBMI",
-    "imaging": "Imaging / Frequency",
+    "imaging": "Imaging",
     "auditory_feedback": "Auditory feedback",
     "reward": "Reward",
     "random_stimulation": "Random stimulation",
@@ -127,7 +127,7 @@ class CaBMIConfigGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("CaBMI Config GUI v7")
+        self.title("CaBMI Config GUI v10")
         self.geometry("1350x850")
 
         self.cm = ConfigManager(CONFIG_ROOT)
@@ -154,8 +154,13 @@ class CaBMIConfigGUI(tk.Tk):
         self.animal_var = tk.StringVar()
 
         self.date_var = tk.StringVar(value=date.today().strftime("%Y_%m_%d"))
+        self.date_var.trace_add("write", lambda *args: self.update_day_status())
         self.day_var = tk.StringVar()
+        self.day_var.trace_add("write", self.on_day_changed)
         self.save_base_dir_var = tk.StringVar(value=str(DATA_ROOT))
+
+        self.day_status_var = tk.StringVar(value="")
+        self._last_logged_day = ""
 
         self.template_var = tk.StringVar()
         self.template_name_var = tk.StringVar()
@@ -172,17 +177,32 @@ class CaBMIConfigGUI(tk.Tk):
         title = ttk.Label(outer, text="CaBMI Session Configuration", font=("Segoe UI", 16, "bold"))
         title.pack(anchor="w", pady=(0, 10))
 
-        main = ttk.PanedWindow(outer, orient="horizontal")
-        main.pack(fill="both", expand=True)
+        self.main_paned = ttk.PanedWindow(outer, orient="horizontal")
+        self.main_paned.pack(fill="both", expand=True)
 
-        left = ttk.Frame(main, padding=6)
-        right = ttk.Frame(main, padding=6)
+        left = ttk.Frame(self.main_paned, padding=6)
+        right = ttk.Frame(self.main_paned, padding=6)
 
-        main.add(left, weight=1)
-        main.add(right, weight=4)
+        self.main_paned.add(left, weight=0)
+        self.main_paned.add(right, weight=1)
 
         self._build_left_panel(left)
         self._build_right_panel(right)
+
+        # Force the left panel to stay narrow after Tk has calculated geometry.
+        self.after(150, self.set_left_panel_width)
+
+    def set_left_panel_width(self):
+        """
+        Keep the left session panel narrow.
+
+        The left panel only needs enough room for selectors and session notes.
+        The right panel contains the experiment/template and settings editors.
+        """
+        try:
+            self.main_paned.sashpos(0, 500)
+        except Exception:
+            pass
 
     def _build_left_panel(self, parent):
         select_box = ttk.LabelFrame(parent, text="Session setup")
@@ -200,7 +220,13 @@ class CaBMIConfigGUI(tk.Tk):
         ttk.Button(select_box, text="Edit", command=self.edit_animal_popup).grid(row=2, column=4, padx=4)
 
         self._entry_row(select_box, "Date", self.date_var, 3)
-        self._entry_row(select_box, "Day", self.day_var, 4)
+
+        ttk.Label(select_box, text="Day").grid(row=4, column=0, sticky="w", pady=4)
+        day_frame = ttk.Frame(select_box)
+        day_frame.grid(row=4, column=1, sticky="ew", pady=4)
+        day_frame.columnconfigure(0, weight=1)
+        ttk.Entry(day_frame, textvariable=self.day_var).grid(row=0, column=0, sticky="ew")
+        ttk.Label(day_frame, textvariable=self.day_status_var).grid(row=0, column=1, sticky="w", padx=(6, 0))
 
         ttk.Label(select_box, text="Save path").grid(row=5, column=0, sticky="w", pady=4)
         ttk.Entry(select_box, textvariable=self.save_base_dir_var).grid(row=5, column=1, sticky="ew", pady=4)
@@ -213,8 +239,8 @@ class CaBMIConfigGUI(tk.Tk):
         action_frame = ttk.Frame(select_box)
         action_frame.grid(row=7, column=0, columnspan=5, sticky="e", pady=(8, 4))
         ttk.Button(action_frame, text="Preview Config", command=self.preview_session_config).pack(side="left", padx=4)
-        ttk.Button(action_frame, text="Save Session Config", command=self.save_session_config).pack(side="left", padx=4)
-        ttk.Button(action_frame, text="Launch CaBMI (not active yet)", state="disabled").pack(side="left", padx=4)
+        ttk.Button(action_frame, text="Save Config", command=self.save_session_config).pack(side="left", padx=4)
+        ttk.Button(action_frame, text="Launch CaBMI", state="disabled").pack(side="left", padx=4)
 
         ttk.Label(select_box, text="Pre-session notes").grid(row=8, column=0, sticky="nw", pady=4)
         self.session_notes_text = tk.Text(select_box, height=5, wrap="word")
@@ -230,7 +256,7 @@ class CaBMIConfigGUI(tk.Tk):
         status_frame = ttk.Frame(status_box)
         status_frame.pack(fill="both", expand=True)
 
-        self.status_text = tk.Text(status_frame, height=10, wrap="word")
+        self.status_text = tk.Text(status_frame, height=7, wrap="word")
         status_scroll = ttk.Scrollbar(status_frame, orient="vertical", command=self.status_text.yview)
         self.status_text.configure(yscrollcommand=status_scroll.set)
 
@@ -268,23 +294,22 @@ class CaBMIConfigGUI(tk.Tk):
 
         ttk.Button(parent, text="Load", command=self.load_selected_template).grid(row=0, column=2, padx=4)
 
-        self._entry_row(parent, "Experiment/template name", self.template_name_var, 1)
-        self._entry_row(parent, "Description", self.template_description_var, 2)
+        self._entry_row(parent, "Description", self.template_description_var, 1)
 
-        ttk.Label(parent, text="Notes").grid(row=3, column=0, sticky="nw", pady=3)
+        ttk.Label(parent, text="Notes").grid(row=2, column=0, sticky="nw", pady=3)
         self.template_notes_text = tk.Text(parent, height=3, wrap="word")
-        self.template_notes_text.grid(row=3, column=1, columnspan=4, sticky="ew", pady=3)
+        self.template_notes_text.grid(row=2, column=1, columnspan=4, sticky="ew", pady=3)
         self.template_notes_text.bind("<Tab>", self.focus_next_widget)
         self.template_notes_text.bind("<Shift-Tab>", self.focus_previous_widget)
 
         template_button_frame = ttk.Frame(parent)
-        template_button_frame.grid(row=4, column=1, columnspan=4, sticky="e", pady=(4, 8))
+        template_button_frame.grid(row=3, column=1, columnspan=4, sticky="e", pady=(4, 8))
         ttk.Button(template_button_frame, text="Save Template", command=self.save_template_overwrite).pack(side="left", padx=4)
         ttk.Button(template_button_frame, text="Save As New Template", command=self.save_template_as_new).pack(side="left", padx=4)
 
         # Capabilities
         cap_frame = ttk.LabelFrame(parent, text="Capabilities")
-        cap_frame.grid(row=5, column=0, columnspan=5, sticky="ew", pady=(8, 3))
+        cap_frame.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 3))
 
         for idx, (key, label) in enumerate(CAPABILITY_LABELS.items()):
             var = tk.BooleanVar(value=False)
@@ -372,15 +397,67 @@ class CaBMIConfigGUI(tk.Tk):
 
     def refresh_suggested_day(self, log_change: bool = False):
         user, project, animal = self.user_var.get(), self.project_var.get(), self.animal_var.get()
-        experiment_name = self.template_name_var.get() or self.current_template_name or "experiment"
+        experiment_name = self.get_current_experiment_name()
 
         if user and project and animal:
             old_day = self.day_var.get()
             new_day = self.cm.suggest_next_day(user, project, animal, experiment_name)
             self.day_var.set(new_day)
+            self.update_day_status()
 
             if log_change and old_day and old_day != new_day:
                 self.log(f"Day automatically updated: {old_day} → {new_day}")
+
+    def on_day_changed(self, *args):
+        day = self.day_var.get()
+
+        # Avoid logging the same value repeatedly during programmatic refreshes.
+        if day and day != self._last_logged_day:
+            self._last_logged_day = day
+            self.log(f"Selected day: {day}")
+
+        self.update_day_status()
+
+    def get_current_experiment_name(self):
+        label = self.template_var.get()
+        if label and ":" in label:
+            _, name = label.split(":", 1)
+            return name
+
+        return self.current_template_name or "experiment"
+
+    def current_session_id_from_fields(self):
+        user = self.user_var.get()
+        project = self.project_var.get()
+        animal = self.animal_var.get()
+        day = self.day_var.get()
+        session_date = self.date_var.get()
+        experiment_name = self.get_current_experiment_name()
+
+        if not (user and project and animal and day and session_date):
+            return ""
+
+        experiment_slug = self.slug_for_display(experiment_name)
+        return f"{animal}_{experiment_slug}_{session_date}_{day}"
+
+    def update_day_status(self):
+        user = self.user_var.get()
+        project = self.project_var.get()
+        session_id = self.current_session_id_from_fields()
+
+        if not (user and project and session_id):
+            self.day_status_var.set("")
+            return
+
+        try:
+            exists = self.cm.session_exists(user, project, session_id)
+        except Exception:
+            exists = False
+
+        if exists:
+            self.day_status_var.set("⚠ already saved")
+        else:
+            self.day_status_var.set("✓ available")
 
     def refresh_day_button_clicked(self):
         old_day = self.day_var.get()
@@ -393,6 +470,8 @@ class CaBMIConfigGUI(tk.Tk):
             self.log(f"Day refreshed: {old_day} → {new_day}")
         else:
             self.log(f"Day set to suggested value: {new_day}")
+
+        self.update_day_status()
 
     # ------------------------------------------------------------------
     # Change handlers
@@ -409,7 +488,11 @@ class CaBMIConfigGUI(tk.Tk):
         self.refresh_suggested_day()
 
     def on_animal_changed(self, event=None):
+        animal = self.animal_var.get()
+        if animal:
+            self.log(f"Selected animal: {animal}")
         self.refresh_suggested_day()
+        self.update_day_status()
 
     def on_template_changed(self, event=None):
         self.load_selected_template()
@@ -589,6 +672,7 @@ class CaBMIConfigGUI(tk.Tk):
 
         self.load_template_into_gui(template)
         self.log(f"Loaded experiment template: {label}")
+        self.update_day_status()
 
     def normalize_template(self, template):
         normalized = copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE)
@@ -816,7 +900,7 @@ class CaBMIConfigGUI(tk.Tk):
             except json.JSONDecodeError as e:
                 raise ValueError(f"Custom JSON is invalid: {e}")
 
-        experiment_name = self.slug_for_display(template.get("display_name") or template.get("template_name") or "experiment")
+        experiment_name = self.get_current_experiment_name()
 
         # Ensure experiment record exists because ConfigManager requires it.
         if not self.cm.get_experiment(user, project, experiment_name):
@@ -844,20 +928,98 @@ class CaBMIConfigGUI(tk.Tk):
             },
         )
 
+    def make_human_readable_summary(self, config: dict) -> str:
+        settings = config.get("settings_used", {})
+        capabilities = settings.get("capabilities", {})
+
+        lines = []
+        lines.append("=" * 60)
+        lines.append("CaBMI Session Summary")
+        lines.append("=" * 60)
+        lines.append("")
+        lines.append(f"User:        {config.get('user', '')}")
+        lines.append(f"Project:     {config.get('project', '')}")
+        lines.append(f"Animal:      {config.get('animal_id', '')}")
+        lines.append(f"Date:        {config.get('date', '')}")
+        lines.append(f"Day:         {config.get('day', '')}")
+        lines.append(f"Template:    {config.get('settings_scope', '')}:{config.get('settings_template', '')}")
+        lines.append("")
+
+        animal = config.get("animal", {})
+        lines.append("Animal")
+        lines.append("-" * 60)
+        lines.append(f"Sex:         {animal.get('sex', '')}")
+        lines.append(f"Genotype:    {animal.get('genotype', '')}")
+        notes = animal.get("notes", "")
+        if notes:
+            lines.append(f"Notes:       {notes}")
+        lines.append("")
+
+        lines.append("Capabilities")
+        lines.append("-" * 60)
+        for key, enabled in capabilities.items():
+            label = CAPABILITY_LABELS.get(key, key)
+            mark = "✓" if enabled else " "
+            lines.append(f"[{mark}] {label}")
+        lines.append("")
+
+        for section_key, enabled in capabilities.items():
+            if not enabled:
+                continue
+
+            section = settings.get(section_key, {})
+            if not isinstance(section, dict):
+                continue
+
+            label = CAPABILITY_LABELS.get(section_key, section_key)
+            lines.append(label)
+            lines.append("-" * 60)
+            for k, v in section.items():
+                lines.append(f"{k}: {v}")
+            lines.append("")
+
+        custom = settings.get("custom", {})
+        if custom:
+            lines.append("Custom")
+            lines.append("-" * 60)
+            for k, v in custom.items():
+                lines.append(f"{k}: {v}")
+            lines.append("")
+
+        extra = config.get("extra", {})
+        pre_notes = extra.get("pre_session_notes") or extra.get("session_notes", "")
+        if pre_notes:
+            lines.append("Pre-session notes")
+            lines.append("-" * 60)
+            lines.append(pre_notes)
+            lines.append("")
+
+        lines.append("=" * 60)
+        return "\n".join(lines)
+
     def preview_session_config(self):
         try:
             config = self.build_current_session_config()
+            summary = self.make_human_readable_summary(config)
         except Exception as e:
             messagebox.showerror("Cannot build session config", str(e))
             return
 
         top = tk.Toplevel(self)
         top.title("Session Config Preview")
-        top.geometry("850x650")
+        top.geometry("750x650")
 
-        text = tk.Text(top, wrap="none")
-        text.pack(fill="both", expand=True)
-        text.insert("1.0", json.dumps(config, indent=2))
+        frame = ttk.Frame(top, padding=8)
+        frame.pack(fill="both", expand=True)
+
+        text = tk.Text(frame, wrap="word")
+        scroll = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+
+        text.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+
+        text.insert("1.0", summary)
         text.config(state="disabled")
 
     def save_session_config(self):
@@ -910,6 +1072,7 @@ class CaBMIConfigGUI(tk.Tk):
         messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
         self.log(f"Saved session config: {path}")
         self.refresh_suggested_day()
+        self.update_day_status()
 
     # ------------------------------------------------------------------
     # Helpers

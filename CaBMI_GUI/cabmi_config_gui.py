@@ -1,20 +1,24 @@
 
 """
-cabmi_config_gui.py
+cabmi_config_gui_v5.py
 
-First single-page GUI for CaBMI session configuration.
+Redesigned CaBMI configuration GUI.
 
-This version does NOT launch CaBMI yet.
-It only tests the workflow:
+Main design:
+    LEFT PANEL:
+        Session selection only:
+        user, project, animal, date/day, save path, session notes.
 
-User -> Project -> Experiment -> Animal -> Template -> Session Config
+    RIGHT TOP:
+        Experiment configuration template:
+        experiment/template name, description, notes, capabilities,
+        load/save/save-as template.
 
-Template dropdown loads templates automatically when selected.
-The Load button reloads the selected template explicitly.
+    RIGHT BOTTOM:
+        Settings tabs generated from selected capabilities.
 
-Requirements:
-    - config_manager_project_hierarchy.py must be in the same folder,
-      or rename it to config_manager.py and update the import below.
+Animal creation/cloning happens through pop-up windows.
+Template = experiment configuration preset.
 """
 
 from __future__ import annotations
@@ -29,22 +33,103 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from config_manager import ConfigManager, DEFAULT_TEMPLATE
 
 
+# For testing:
 CONFIG_ROOT = Path(r"C:/Users/Nuria/Documents/Data/gui_tests/config")
 DATA_ROOT = Path(r"C:/Users/Nuria/Documents/Data/gui_tests/config_data")
+
+
+DEFAULT_EXPERIMENT_TEMPLATE = {
+    "template_name": "default_cabmi",
+    "display_name": "Default CaBMI",
+    "description": "Default CaBMI experiment configuration.",
+    "notes": "",
+    "capabilities": {
+        "cabmi": True,
+        "imaging": True,
+        "feedback": True,
+        "random_stimulation": True,
+        "holography": False,
+        "photopharm": False,
+        "behavior_camera": False,
+        "external_trigger": False,
+    },
+    "cabmi": {
+        "baseline_len_sec": 300,
+        "bmi_len_sec": 1800,
+        "ensemble_count": 2,
+        "neurons_per_ensemble": 3,
+        "sec_per_reward_range": [20, 60],
+        "f0_win": 30,
+        "load_calibration": False,
+    },
+    "imaging": {
+        "frame_rate_hz": 30,
+        "slidebook_default_dir": "",
+    },
+    "feedback": {
+        "enabled": True,
+        "arduino_com": "COM3",
+        "arduino_baudrate": 9600,
+    },
+    "random_stimulation": {
+        "enabled": True,
+        "ihsi_mean": 10,
+        "ihsi_range": 3,
+    },
+    "holography": {
+        "enabled": False,
+        "laser_power_mw": 0,
+        "stim_duration_ms": 0,
+        "target_cells": "",
+    },
+    "photopharm": {
+        "enabled": False,
+        "activation_wavelength_nm": 450,
+        "reset_wavelength_nm": 375,
+        "activation_duration_ms": 300,
+        "reset_duration_ms": 1000,
+    },
+    "behavior_camera": {
+        "enabled": False,
+        "camera_name": "",
+        "frame_rate_hz": 0,
+    },
+    "external_trigger": {
+        "enabled": False,
+        "device": "",
+        "channel": "",
+    },
+    "custom": {},
+}
+
+
+CAPABILITY_LABELS = {
+    "cabmi": "CaBMI",
+    "imaging": "Imaging / Frequency",
+    "feedback": "Feedback",
+    "random_stimulation": "Random stimulation",
+    "holography": "Holography",
+    "photopharm": "Photopharm",
+    "behavior_camera": "Behavior camera",
+    "external_trigger": "External trigger",
+}
 
 
 class CaBMIConfigGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("CaBMI Config GUI")
-        self.geometry("1100x850")
+        self.title("CaBMI Config GUI v5")
+        self.geometry("1200x850")
 
         self.cm = ConfigManager(CONFIG_ROOT)
-
-        self.current_settings = copy.deepcopy(DEFAULT_TEMPLATE)
-        self.current_template_scope = "project"
+        self.current_template = copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE)
         self.current_template_name = "default_cabmi"
+        self.current_template_scope = "project"
+
+        self.capability_vars: dict[str, tk.BooleanVar] = {}
+        self.setting_vars: dict[str, dict[str, tk.Variable]] = {}
+        self.settings_notebook: ttk.Notebook | None = None
 
         self._build_variables()
         self._build_layout()
@@ -57,48 +142,15 @@ class CaBMIConfigGUI(tk.Tk):
     def _build_variables(self):
         self.user_var = tk.StringVar()
         self.project_var = tk.StringVar()
-        self.experiment_var = tk.StringVar()
         self.animal_var = tk.StringVar()
-        self.template_var = tk.StringVar()
 
         self.date_var = tk.StringVar(value=date.today().strftime("%Y_%m_%d"))
         self.day_var = tk.StringVar()
         self.save_base_dir_var = tk.StringVar(value=str(DATA_ROOT))
 
-        # Experiment fields
-        self.exp_display_var = tk.StringVar()
-        self.exp_description_var = tk.StringVar()
-        self.exp_notes_var = tk.StringVar()
-
-        # Animal fields
-        self.animal_id_var = tk.StringVar()
-        self.sex_var = tk.StringVar(value="U")
-        self.genotype_var = tk.StringVar()
-        self.animal_notes_var = tk.StringVar()
-
-        # Settings fields
-        self.frame_rate_var = tk.StringVar()
-        self.baseline_len_var = tk.StringVar()
-        self.bmi_len_var = tk.StringVar()
-        self.ensemble_count_var = tk.StringVar()
-        self.neurons_per_ensemble_var = tk.StringVar()
-        self.reward_min_var = tk.StringVar()
-        self.reward_max_var = tk.StringVar()
-
-        self.feedback_enabled_var = tk.BooleanVar()
-        self.arduino_com_var = tk.StringVar()
-        self.arduino_baudrate_var = tk.StringVar()
-
-        self.save_data_var = tk.BooleanVar()
-        self.load_calibration_var = tk.BooleanVar()
-        self.f0_win_var = tk.StringVar()
-        self.ihsi_mean_var = tk.StringVar()
-        self.ihsi_range_var = tk.StringVar()
-
-        self.slidebook_dir_var = tk.StringVar()
-
-        # Session log / notes
-        self.session_notes_var = tk.StringVar()
+        self.template_var = tk.StringVar()
+        self.template_name_var = tk.StringVar()
+        self.template_description_var = tk.StringVar()
 
     # ------------------------------------------------------------------
     # Layout
@@ -108,243 +160,117 @@ class CaBMIConfigGUI(tk.Tk):
         outer = ttk.Frame(self, padding=12)
         outer.pack(fill="both", expand=True)
 
-        title = ttk.Label(
-            outer,
-            text="CaBMI Session Configuration",
-            font=("Segoe UI", 16, "bold"),
-        )
+        title = ttk.Label(outer, text="CaBMI Session Configuration", font=("Segoe UI", 16, "bold"))
         title.pack(anchor="w", pady=(0, 10))
 
-        # Scrollable-ish main area using PanedWindow
         main = ttk.PanedWindow(outer, orient="horizontal")
         main.pack(fill="both", expand=True)
 
         left = ttk.Frame(main, padding=6)
         right = ttk.Frame(main, padding=6)
+
         main.add(left, weight=1)
-        main.add(right, weight=2)
+        main.add(right, weight=3)
 
-        self._build_selection_panel(left)
-        self._build_details_panel(right)
+        self._build_left_panel(left)
+        self._build_right_panel(right)
 
-        bottom = ttk.Frame(outer)
-        bottom.pack(fill="x", pady=(10, 0))
+    def _build_left_panel(self, parent):
+        select_box = ttk.LabelFrame(parent, text="Session setup")
+        select_box.pack(fill="x", pady=5)
 
-        ttk.Button(bottom, text="Launch CaBMI (not active yet)", state="disabled").pack(
-            side="right", padx=5
+        self.user_combo = self._combo_row(select_box, "User", self.user_var, self.on_user_changed, 0)
+        ttk.Button(select_box, text="New", command=self.new_user).grid(row=0, column=2, padx=4)
+
+        self.project_combo = self._combo_row(select_box, "Project", self.project_var, self.on_project_changed, 1)
+        ttk.Button(select_box, text="New", command=self.new_project).grid(row=1, column=2, padx=4)
+
+        self.animal_combo = self._combo_row(select_box, "Animal", self.animal_var, self.on_animal_changed, 2)
+        ttk.Button(select_box, text="New", command=self.new_animal_popup).grid(row=2, column=2, padx=4)
+        ttk.Button(select_box, text="Clone", command=self.clone_animal_popup).grid(row=2, column=3, padx=4)
+        ttk.Button(select_box, text="Edit", command=self.edit_animal_popup).grid(row=2, column=4, padx=4)
+
+        self._entry_row(select_box, "Date", self.date_var, 3)
+        self._entry_row(select_box, "Day", self.day_var, 4)
+
+        ttk.Label(select_box, text="Save path").grid(row=5, column=0, sticky="w", pady=4)
+        ttk.Entry(select_box, textvariable=self.save_base_dir_var).grid(row=5, column=1, sticky="ew", pady=4)
+        ttk.Button(select_box, text="Browse", command=self.browse_save_base_dir).grid(row=5, column=2, padx=4)
+
+        ttk.Button(select_box, text="Refresh day", command=self.refresh_suggested_day).grid(
+            row=6, column=1, sticky="e", pady=4
         )
 
-    def _build_selection_panel(self, parent):
-        box = ttk.LabelFrame(parent, text="Select")
-        box.pack(fill="x", pady=5)
+        ttk.Label(select_box, text="Session notes / log").grid(row=7, column=0, sticky="nw", pady=4)
+        self.session_notes_text = tk.Text(select_box, height=6, wrap="word")
+        self.session_notes_text.grid(row=7, column=1, columnspan=4, sticky="ew", pady=4)
 
-        self.user_combo = self._combo_row(
-            box, "User", self.user_var, self.on_user_changed, row=0
-        )
-        ttk.Button(box, text="New User", command=self.new_user).grid(row=0, column=2, padx=4)
-
-        self.project_combo = self._combo_row(
-            box, "Project", self.project_var, self.on_project_changed, row=1
-        )
-        ttk.Button(box, text="New Project", command=self.new_project).grid(row=1, column=2, padx=4)
-
-        self.experiment_combo = self._combo_row(
-            box, "Experiment", self.experiment_var, self.on_experiment_changed, row=2
-        )
-        ttk.Button(box, text="New", command=self.new_experiment).grid(row=2, column=2, padx=4)
-        ttk.Button(box, text="Clone", command=self.clone_experiment).grid(row=2, column=3, padx=4)
-
-        self.animal_combo = self._combo_row(
-            box, "Animal", self.animal_var, self.on_animal_changed, row=3
-        )
-        ttk.Button(box, text="New", command=self.new_animal).grid(row=3, column=2, padx=4)
-        ttk.Button(box, text="Clone", command=self.clone_animal).grid(row=3, column=3, padx=4)
-
-        self.template_combo = self._combo_row(
-            box, "Template", self.template_var, self.on_template_changed, row=4
-        )
-        ttk.Button(box, text="Load", command=self.on_template_changed).grid(row=4, column=2, padx=4)
-        ttk.Button(box, text="New", command=self.new_template).grid(row=4, column=3, padx=4)
-        ttk.Button(box, text="Clone", command=self.clone_template).grid(row=4, column=4, padx=4)
+        action_frame = ttk.Frame(select_box)
+        action_frame.grid(row=8, column=0, columnspan=5, sticky="e", pady=(8, 0))
+        ttk.Button(action_frame, text="Preview Session Config", command=self.preview_session_config).pack(side="left", padx=4)
+        ttk.Button(action_frame, text="Save Session Config", command=self.save_session_config).pack(side="left", padx=4)
+        ttk.Button(action_frame, text="Launch CaBMI (not active yet)", state="disabled").pack(side="left", padx=4)
 
         for i in range(5):
-            box.columnconfigure(i, weight=1)
+            select_box.columnconfigure(i, weight=1)
 
-        session_box = ttk.LabelFrame(parent, text="Session")
-        session_box.pack(fill="x", pady=8)
-
-        self._entry_row(session_box, "Date", self.date_var, row=0)
-        self._entry_row(session_box, "Day", self.day_var, row=1)
-
-        ttk.Label(session_box, text="Save base dir").grid(row=2, column=0, sticky="w", pady=3)
-        ttk.Entry(session_box, textvariable=self.save_base_dir_var).grid(
-            row=2, column=1, sticky="ew", pady=3
-        )
-        ttk.Button(session_box, text="Browse", command=self.browse_save_base_dir).grid(
-            row=2, column=2, padx=4
-        )
-
-        ttk.Button(session_box, text="Refresh suggested day", command=self.refresh_suggested_day).grid(
-            row=3, column=1, sticky="e", pady=5
-        )
-
-        ttk.Label(session_box, text="Session notes / log").grid(row=4, column=0, sticky="nw", pady=3)
-        self.session_notes_text = tk.Text(session_box, height=4, wrap="word")
-        self.session_notes_text.grid(row=4, column=1, columnspan=2, sticky="ew", pady=3)
-
-        action_frame = ttk.Frame(session_box)
-        action_frame.grid(row=5, column=0, columnspan=3, sticky="e", pady=(8, 0))
-
-        ttk.Button(
-            action_frame,
-            text="Preview Session Config",
-            command=self.preview_session_config,
-        ).pack(side="left", padx=4)
-
-        ttk.Button(
-            action_frame,
-            text="Save Session Config",
-            command=self.save_session_config,
-        ).pack(side="left", padx=4)
-
-        session_box.columnconfigure(1, weight=1)
-
-        info_box = ttk.LabelFrame(parent, text="Status")
-        info_box.pack(fill="both", expand=True, pady=8)
-
-        self.status_text = tk.Text(info_box, height=14, wrap="word")
+        status_box = ttk.LabelFrame(parent, text="Status")
+        status_box.pack(fill="both", expand=True, pady=8)
+        self.status_text = tk.Text(status_box, height=10, wrap="word")
         self.status_text.pack(fill="both", expand=True)
         self.log("Select or create a user to begin.")
 
-    def _build_details_panel(self, parent):
-        notebook = ttk.Notebook(parent)
-        notebook.pack(fill="both", expand=True)
+    def _build_right_panel(self, parent):
+        parent.rowconfigure(0, weight=0)
+        parent.rowconfigure(1, weight=1)
+        parent.columnconfigure(0, weight=1)
 
-        exp_tab = ttk.Frame(notebook, padding=10)
-        animal_tab = ttk.Frame(notebook, padding=10)
-        settings_tab = ttk.Frame(notebook, padding=10)
-        advanced_tab = ttk.Frame(notebook, padding=10)
+        experiment_box = ttk.LabelFrame(parent, text="Experiment configuration template")
+        experiment_box.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        self._build_experiment_template_panel(experiment_box)
 
-        notebook.add(exp_tab, text="Experiment")
-        notebook.add(animal_tab, text="Animal")
-        notebook.add(settings_tab, text="Settings")
-        notebook.add(advanced_tab, text="Advanced")
+        settings_box = ttk.LabelFrame(parent, text="Settings for selected capabilities")
+        settings_box.grid(row=1, column=0, sticky="nsew")
+        settings_box.rowconfigure(0, weight=1)
+        settings_box.columnconfigure(0, weight=1)
 
-        self._build_experiment_tab(exp_tab)
-        self._build_animal_tab(animal_tab)
-        self._build_settings_tab(settings_tab)
-        self._build_advanced_tab(advanced_tab)
+        self.settings_notebook = ttk.Notebook(settings_box)
+        self.settings_notebook.grid(row=0, column=0, sticky="nsew")
 
-    def _build_experiment_tab(self, parent):
-        self._entry_row(parent, "Experiment name", self.exp_display_var, row=0)
-        self._entry_row(parent, "Description", self.exp_description_var, row=1)
+    def _build_experiment_template_panel(self, parent):
+        # Template selection
+        ttk.Label(parent, text="Template").grid(row=0, column=0, sticky="w", pady=3)
+        self.template_combo = ttk.Combobox(parent, textvariable=self.template_var, state="readonly")
+        self.template_combo.grid(row=0, column=1, sticky="ew", pady=3)
+        self.template_combo.bind("<<ComboboxSelected>>", self.on_template_changed)
 
-        ttk.Label(parent, text="Notes").grid(row=2, column=0, sticky="nw", pady=3)
-        self.exp_notes_text = tk.Text(parent, height=3, wrap="word")
-        self.exp_notes_text.grid(row=2, column=1, sticky="ew", pady=3)
+        ttk.Button(parent, text="Load", command=self.load_selected_template).grid(row=0, column=2, padx=4)
+        ttk.Button(parent, text="Save", command=self.save_template_overwrite).grid(row=0, column=3, padx=4)
+        ttk.Button(parent, text="Save As", command=self.save_template_as_new).grid(row=0, column=4, padx=4)
 
-        ttk.Button(parent, text="Save Experiment", command=self.save_experiment).grid(
-            row=3, column=1, sticky="e", pady=8
-        )
-
-        parent.columnconfigure(1, weight=1)
-        # Notes should stay compact, not expand vertically.
-        parent.rowconfigure(2, weight=0)
-
-    def _build_animal_tab(self, parent):
-        self._entry_row(parent, "Animal ID", self.animal_id_var, row=0)
-
-        ttk.Label(parent, text="Sex").grid(row=1, column=0, sticky="w", pady=3)
-        ttk.Combobox(
-            parent,
-            textvariable=self.sex_var,
-            values=["M", "F", "U"],
-            state="readonly",
-            width=10,
-        ).grid(row=1, column=1, sticky="w", pady=3)
-
-        self._entry_row(parent, "Genotype", self.genotype_var, row=2)
+        self._entry_row(parent, "Experiment/template name", self.template_name_var, 1)
+        self._entry_row(parent, "Description", self.template_description_var, 2)
 
         ttk.Label(parent, text="Notes").grid(row=3, column=0, sticky="nw", pady=3)
-        self.animal_notes_text = tk.Text(parent, height=3, wrap="word")
-        self.animal_notes_text.grid(row=3, column=1, sticky="ew", pady=3)
+        self.template_notes_text = tk.Text(parent, height=3, wrap="word")
+        self.template_notes_text.grid(row=3, column=1, columnspan=4, sticky="ew", pady=3)
 
-        ttk.Button(parent, text="Save Animal", command=self.save_animal).grid(
-            row=4, column=1, sticky="e", pady=8
-        )
+        # Capabilities
+        cap_frame = ttk.LabelFrame(parent, text="Capabilities")
+        cap_frame.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 3))
 
-        parent.columnconfigure(1, weight=1)
-        # Notes should stay compact, not expand vertically.
-        parent.rowconfigure(3, weight=0)
-
-    def _build_settings_tab(self, parent):
-        self._entry_row(parent, "Frame rate (Hz)", self.frame_rate_var, row=0)
-        self._entry_row(parent, "Baseline length (sec)", self.baseline_len_var, row=1)
-        self._entry_row(parent, "BMI length (sec)", self.bmi_len_var, row=2)
-        self._entry_row(parent, "Ensemble count", self.ensemble_count_var, row=3)
-        self._entry_row(parent, "Neurons per ensemble", self.neurons_per_ensemble_var, row=4)
-
-        ttk.Label(parent, text="Sec per reward range").grid(row=5, column=0, sticky="w", pady=3)
-        range_frame = ttk.Frame(parent)
-        range_frame.grid(row=5, column=1, sticky="w", pady=3)
-        ttk.Entry(range_frame, textvariable=self.reward_min_var, width=8).pack(side="left")
-        ttk.Label(range_frame, text=" to ").pack(side="left")
-        ttk.Entry(range_frame, textvariable=self.reward_max_var, width=8).pack(side="left")
-
-        ttk.Checkbutton(parent, text="Feedback enabled", variable=self.feedback_enabled_var).grid(
-            row=6, column=1, sticky="w", pady=3
-        )
-        self._entry_row(parent, "Arduino COM", self.arduino_com_var, row=7)
-        self._entry_row(parent, "Arduino baudrate", self.arduino_baudrate_var, row=8)
-
-        ttk.Button(parent, text="Overwrite Current Template", command=self.save_template_overwrite).grid(
-            row=9, column=1, sticky="e", pady=8
-        )
-        ttk.Button(parent, text="Save As New Named Template", command=self.save_template_as_new).grid(
-            row=9, column=0, sticky="w", pady=8
-        )
+        for idx, (key, label) in enumerate(CAPABILITY_LABELS.items()):
+            var = tk.BooleanVar(value=False)
+            self.capability_vars[key] = var
+            cb = ttk.Checkbutton(
+                cap_frame,
+                text=label,
+                variable=var,
+                command=self.on_capabilities_changed,
+            )
+            cb.grid(row=idx // 4, column=idx % 4, sticky="w", padx=8, pady=3)
 
         parent.columnconfigure(1, weight=1)
-
-    def _build_advanced_tab(self, parent):
-        ttk.Checkbutton(parent, text="Save data", variable=self.save_data_var).grid(
-            row=0, column=1, sticky="w", pady=3
-        )
-        ttk.Checkbutton(parent, text="Load calibration", variable=self.load_calibration_var).grid(
-            row=1, column=1, sticky="w", pady=3
-        )
-
-        self._entry_row(parent, "F0 window", self.f0_win_var, row=2)
-        self._entry_row(parent, "Random stim IHSI mean", self.ihsi_mean_var, row=3)
-        self._entry_row(parent, "Random stim IHSI range", self.ihsi_range_var, row=4)
-
-        ttk.Label(parent, text="Slidebook default dir").grid(row=5, column=0, sticky="w", pady=3)
-        ttk.Entry(parent, textvariable=self.slidebook_dir_var).grid(
-            row=5, column=1, sticky="ew", pady=3
-        )
-        ttk.Button(parent, text="Browse", command=self.browse_slidebook_dir).grid(
-            row=5, column=2, padx=4
-        )
-
-        parent.columnconfigure(1, weight=1)
-
-    # ------------------------------------------------------------------
-    # Layout helpers
-    # ------------------------------------------------------------------
-
-    def _combo_row(self, parent, label, var, callback, row):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=4)
-        combo = ttk.Combobox(parent, textvariable=var, state="readonly")
-        combo.grid(row=row, column=1, sticky="ew", pady=4)
-        combo.bind("<<ComboboxSelected>>", callback)
-        return combo
-
-    def _entry_row(self, parent, label, var, row):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=3)
-        entry = ttk.Entry(parent, textvariable=var)
-        entry.grid(row=row, column=1, sticky="ew", pady=3)
-        parent.columnconfigure(1, weight=1)
-        return entry
 
     # ------------------------------------------------------------------
     # Refresh dropdowns
@@ -367,29 +293,14 @@ class CaBMIConfigGUI(tk.Tk):
             self.on_project_changed()
         else:
             self.project_var.set("")
-            self.clear_project_dependent_fields()
-
-    def refresh_experiments(self):
-        user, project = self.user_var.get(), self.project_var.get()
-        experiments = []
-        if user and project:
-            records = self.cm.list_experiments(user, project)
-            experiments = [r["experiment_name"] for r in records]
-        self.experiment_combo["values"] = experiments
-        if experiments:
-            if self.experiment_var.get() not in experiments:
-                self.experiment_var.set(experiments[0])
-            self.on_experiment_changed()
-        else:
-            self.experiment_var.set("")
-            self.clear_experiment_fields()
+            self.refresh_animals()
+            self.refresh_templates()
 
     def refresh_animals(self):
         user, project = self.user_var.get(), self.project_var.get()
         animals = []
         if user and project:
-            records = self.cm.list_animals(user, project)
-            animals = [r["animal_id"] for r in records]
+            animals = [a["animal_id"] for a in self.cm.list_animals(user, project)]
         self.animal_combo["values"] = animals
         if animals:
             if self.animal_var.get() not in animals:
@@ -397,32 +308,47 @@ class CaBMIConfigGUI(tk.Tk):
             self.on_animal_changed()
         else:
             self.animal_var.set("")
-            self.clear_animal_fields()
 
     def refresh_templates(self):
         user, project = self.user_var.get(), self.project_var.get()
         labels = []
         if user and project:
+            # Make sure a default project template exists in new v5 format.
+            self.ensure_v5_default_template(user, project)
             rows = self.cm.list_all_templates(user, project)
             labels = [f"{r['scope']}:{r['name']}" for r in rows]
         self.template_combo["values"] = labels
         if labels:
-            if self.template_var.get() not in labels:
+            preferred = "project:default_cabmi"
+            if preferred in labels:
+                self.template_var.set(preferred)
+            elif self.template_var.get() not in labels:
                 self.template_var.set(labels[0])
-            self.on_template_changed()
+            self.load_selected_template()
         else:
             self.template_var.set("")
-            self.load_settings_into_fields(copy.deepcopy(DEFAULT_TEMPLATE))
+            self.load_template_into_gui(copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE))
+
+    def ensure_v5_default_template(self, user, project):
+        try:
+            current = self.cm.load_template(user, project, "default_cabmi", scope="project")
+        except Exception:
+            current = {}
+
+        if "capabilities" not in current:
+            try:
+                self.cm.save_project_template(
+                    user, project, "default_cabmi", copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE), overwrite=True
+                )
+            except Exception as e:
+                self.log(f"Could not update default template: {e}")
 
     def refresh_suggested_day(self):
-        user = self.user_var.get()
-        project = self.project_var.get()
-        experiment = self.experiment_var.get()
-        animal = self.animal_var.get()
-
-        if user and project and experiment and animal:
-            self.day_var.set(self.cm.suggest_next_day(user, project, animal, experiment))
-            self.log(f"Suggested day updated: {self.day_var.get()}")
+        user, project, animal = self.user_var.get(), self.project_var.get(), self.animal_var.get()
+        experiment_name = self.template_name_var.get() or self.current_template_name or "experiment"
+        if user and project and animal:
+            self.day_var.set(self.cm.suggest_next_day(user, project, animal, experiment_name))
+            self.log(f"Suggested day: {self.day_var.get()}")
 
     # ------------------------------------------------------------------
     # Change handlers
@@ -434,54 +360,23 @@ class CaBMIConfigGUI(tk.Tk):
 
     def on_project_changed(self, event=None):
         self.log(f"Selected project: {self.project_var.get()}")
-        self.refresh_experiments()
         self.refresh_animals()
         self.refresh_templates()
         self.refresh_suggested_day()
 
-    def on_experiment_changed(self, event=None):
-        user, project, exp = self.user_var.get(), self.project_var.get(), self.experiment_var.get()
-        if user and project and exp:
-            record = self.cm.get_experiment(user, project, exp)
-            if record:
-                self.exp_display_var.set(record.get("display_name", exp))
-                self.exp_description_var.set(record.get("description", ""))
-                self.exp_notes_text.delete("1.0", "end")
-                self.exp_notes_text.insert("1.0", record.get("notes", ""))
-        self.refresh_suggested_day()
-
     def on_animal_changed(self, event=None):
-        user, project, animal_id = self.user_var.get(), self.project_var.get(), self.animal_var.get()
-        if user and project and animal_id:
-            record = self.cm.get_animal(user, project, animal_id)
-            if record:
-                self.animal_id_var.set(record.get("animal_id", ""))
-                self.sex_var.set(record.get("sex", "U"))
-                self.genotype_var.set(record.get("genotype", ""))
-                self.animal_notes_text.delete("1.0", "end")
-                self.animal_notes_text.insert("1.0", record.get("notes", ""))
         self.refresh_suggested_day()
 
     def on_template_changed(self, event=None):
-        label = self.template_var.get()
-        if not label or ":" not in label:
-            return
-        scope, name = label.split(":", 1)
-        user, project = self.user_var.get(), self.project_var.get()
-        try:
-            settings = self.cm.load_template(user, project, name, scope=scope)
-        except Exception as e:
-            messagebox.showerror("Template error", str(e))
-            return
+        self.load_selected_template()
 
-        self.current_settings = settings
-        self.current_template_scope = scope
-        self.current_template_name = name
-        self.load_settings_into_fields(settings)
-        self.log(f"Loaded template: {label}")
+    def on_capabilities_changed(self):
+        self.collect_template_from_gui(update_current=True)
+        self.rebuild_settings_tabs()
+        self.refresh_suggested_day()
 
     # ------------------------------------------------------------------
-    # Create / clone actions
+    # User/project creation
     # ------------------------------------------------------------------
 
     def new_user(self):
@@ -489,7 +384,7 @@ class CaBMIConfigGUI(tk.Tk):
         if not name:
             return
         self.cm.create_user(name)
-        self.user_var.set(name.lower().replace(" ", "_"))
+        self.user_var.set(self.slug_for_display(name))
         self.refresh_users()
         self.log(f"Created user: {name}")
 
@@ -501,129 +396,207 @@ class CaBMIConfigGUI(tk.Tk):
         if not name:
             return
         self.cm.create_project(user, name)
-        self.project_var.set(name.lower().replace(" ", "_"))
+        self.project_var.set(self.slug_for_display(name))
         self.refresh_projects()
         self.log(f"Created project: {name}")
 
-    def new_experiment(self):
-        self.clear_experiment_fields()
-        self.exp_display_var.set("")
-        self.log("New experiment form ready. Fill fields and click Save Experiment.")
-
-    def clone_experiment(self):
-        user, project, exp = self.require_user_project_experiment()
-        if not exp:
-            return
-        record = self.cm.get_experiment(user, project, exp)
-        if not record:
-            return
-
-        self.exp_display_var.set(record.get("display_name", exp) + "_copy")
-        self.exp_description_var.set(record.get("description", ""))
-        self.exp_notes_text.delete("1.0", "end")
-        self.exp_notes_text.insert("1.0", record.get("notes", ""))
-        self.experiment_var.set("")
-        self.log("Experiment cloned into editable fields. Change name and click Save Experiment.")
-
-    def new_animal(self):
-        self.clear_animal_fields()
-        self.log("New animal form ready. Fill fields and click Save Animal.")
-
-    def clone_animal(self):
-        user, project, animal_id = self.require_user_project_animal()
-        if not animal_id:
-            return
-        record = self.cm.get_animal(user, project, animal_id)
-        if not record:
-            return
-
-        self.animal_id_var.set(record.get("animal_id", "") + "_copy")
-        self.sex_var.set(record.get("sex", "U"))
-        self.genotype_var.set(record.get("genotype", ""))
-        self.animal_notes_text.delete("1.0", "end")
-        self.animal_notes_text.insert("1.0", record.get("notes", ""))
-        self.animal_var.set("")
-        self.log("Animal cloned into editable fields. Change ID/fields and click Save Animal.")
-
-    def new_template(self):
-        self.current_settings = copy.deepcopy(DEFAULT_TEMPLATE)
-        self.current_template_scope = "project"
-        self.current_template_name = ""
-        self.template_var.set("")
-        self.load_settings_into_fields(self.current_settings)
-        self.log("New template form ready. Edit fields and click Save As New Template.")
-
-    def clone_template(self):
-        if not self.template_var.get():
-            messagebox.showwarning("No template", "Select a template first.")
-            return
-        self.current_template_name = ""
-        self.template_var.set("")
-        self.log("Template cloned into editable fields. Click Save As New Template.")
-
     # ------------------------------------------------------------------
-    # Save actions
+    # Animal popups
     # ------------------------------------------------------------------
 
-    def save_experiment(self):
+    def new_animal_popup(self):
         user, project = self.require_user_project()
         if not project:
             return
-        name = self.exp_display_var.get().strip()
-        if not name:
-            messagebox.showerror("Missing name", "Experiment name cannot be empty.")
-            return
+        self.open_animal_popup(title="New Animal", mode="new")
 
-        existing = self.cm.get_experiment(user, project, name)
-        overwrite = existing is not None
-        if overwrite:
-            ok = messagebox.askyesno("Overwrite experiment?", f"Overwrite experiment '{name}'?")
-            if not ok:
-                return
-
-        self.cm.save_experiment(
-            user,
-            project,
-            experiment_name=name,
-            description=self.exp_description_var.get(),
-            notes=self.exp_notes_text.get("1.0", "end").strip(),
-            overwrite=overwrite,
-        )
-        self.refresh_experiments()
-        self.experiment_var.set(name.lower().replace(" ", "_"))
-        self.refresh_experiments()
-        self.log(f"Saved experiment: {name}")
-
-    def save_animal(self):
+    def clone_animal_popup(self):
         user, project = self.require_user_project()
-        if not project:
+        animal_id = self.animal_var.get()
+        if not (user and project and animal_id):
+            messagebox.showwarning("Missing animal", "Select an animal to clone.")
             return
 
-        animal_id = self.animal_id_var.get().strip()
-        if not animal_id:
-            messagebox.showerror("Missing animal ID", "Animal ID cannot be empty.")
+        animal = self.cm.get_animal(user, project, animal_id)
+        if not animal:
             return
 
-        existing = self.cm.get_animal(user, project, animal_id)
-        overwrite = existing is not None
-        if overwrite:
-            ok = messagebox.askyesno("Overwrite animal?", f"Overwrite animal '{animal_id}'?")
-            if not ok:
+        clone = copy.deepcopy(animal)
+        clone["animal_id"] = animal_id + "_copy"
+        self.open_animal_popup(title="Clone Animal", mode="new", animal=clone)
+
+    def edit_animal_popup(self):
+        user, project = self.require_user_project()
+        animal_id = self.animal_var.get()
+        if not (user and project and animal_id):
+            messagebox.showwarning("Missing animal", "Select an animal to edit.")
+            return
+
+        animal = self.cm.get_animal(user, project, animal_id)
+        if not animal:
+            return
+        self.open_animal_popup(title="Edit Animal", mode="edit", animal=animal)
+
+    def open_animal_popup(self, title, mode, animal=None):
+        animal = animal or {"animal_id": "", "sex": "U", "genotype": "", "notes": ""}
+
+        win = tk.Toplevel(self)
+        win.title(title)
+        win.geometry("450x330")
+        win.transient(self)
+        win.grab_set()
+
+        animal_id_var = tk.StringVar(value=animal.get("animal_id", ""))
+        sex_var = tk.StringVar(value=animal.get("sex", "U"))
+        genotype_var = tk.StringVar(value=animal.get("genotype", ""))
+
+        frame = ttk.Frame(win, padding=12)
+        frame.pack(fill="both", expand=True)
+
+        ttk.Label(frame, text="Animal ID").grid(row=0, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=animal_id_var).grid(row=0, column=1, sticky="ew", pady=4)
+
+        ttk.Label(frame, text="Sex").grid(row=1, column=0, sticky="w", pady=4)
+        ttk.Combobox(frame, textvariable=sex_var, values=["M", "F", "U"], state="readonly").grid(
+            row=1, column=1, sticky="w", pady=4
+        )
+
+        ttk.Label(frame, text="Genotype").grid(row=2, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=genotype_var).grid(row=2, column=1, sticky="ew", pady=4)
+
+        ttk.Label(frame, text="Notes").grid(row=3, column=0, sticky="nw", pady=4)
+        notes_text = tk.Text(frame, height=4, wrap="word")
+        notes_text.grid(row=3, column=1, sticky="ew", pady=4)
+        notes_text.insert("1.0", animal.get("notes", ""))
+
+        def save():
+            user, project = self.require_user_project()
+            new_id = animal_id_var.get().strip()
+            if not new_id:
+                messagebox.showerror("Missing animal ID", "Animal ID cannot be empty.")
                 return
 
-        self.cm.save_animal(
-            user,
-            project,
-            animal_id=animal_id,
-            sex=self.sex_var.get(),
-            genotype=self.genotype_var.get(),
-            notes=self.animal_notes_text.get("1.0", "end").strip(),
-            overwrite=overwrite,
-        )
-        self.refresh_animals()
-        self.animal_var.set(animal_id)
-        self.refresh_animals()
-        self.log(f"Saved animal: {animal_id}")
+            existing = self.cm.get_animal(user, project, new_id)
+            overwrite = mode == "edit" and existing is not None
+
+            if mode == "new" and existing is not None:
+                messagebox.showerror("Animal exists", f"Animal '{new_id}' already exists.")
+                return
+
+            self.cm.save_animal(
+                user,
+                project,
+                animal_id=new_id,
+                sex=sex_var.get(),
+                genotype=genotype_var.get(),
+                notes=notes_text.get("1.0", "end").strip(),
+                overwrite=overwrite,
+            )
+            self.refresh_animals()
+            self.animal_var.set(new_id)
+            self.refresh_animals()
+            self.log(f"Saved animal: {new_id}")
+            win.destroy()
+
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=4, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        ttk.Button(button_frame, text="Save", command=save).pack(side="left", padx=4)
+        ttk.Button(button_frame, text="Cancel", command=win.destroy).pack(side="left", padx=4)
+
+        frame.columnconfigure(1, weight=1)
+
+    # ------------------------------------------------------------------
+    # Template loading/saving
+    # ------------------------------------------------------------------
+
+    def load_selected_template(self):
+        label = self.template_var.get()
+        if not label or ":" not in label:
+            return
+
+        user, project = self.user_var.get(), self.project_var.get()
+        scope, name = label.split(":", 1)
+
+        try:
+            template = self.cm.load_template(user, project, name, scope=scope)
+        except Exception as e:
+            messagebox.showerror("Template error", str(e))
+            return
+
+        template = self.normalize_template(template)
+        self.current_template = template
+        self.current_template_scope = scope
+        self.current_template_name = name
+
+        self.load_template_into_gui(template)
+        self.log(f"Loaded experiment template: {label}")
+
+    def normalize_template(self, template):
+        normalized = copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE)
+        template = template or {}
+
+        # Convert old template structure if needed.
+        if "task" in template:
+            task = template.get("task", {})
+            normalized["cabmi"]["baseline_len_sec"] = task.get("baseline_len_sec", normalized["cabmi"]["baseline_len_sec"])
+            normalized["cabmi"]["bmi_len_sec"] = task.get("bmi_len_sec", normalized["cabmi"]["bmi_len_sec"])
+            normalized["cabmi"]["ensemble_count"] = task.get("ensemble_count", normalized["cabmi"]["ensemble_count"])
+            normalized["cabmi"]["neurons_per_ensemble"] = task.get("neurons_per_ensemble", normalized["cabmi"]["neurons_per_ensemble"])
+            normalized["cabmi"]["sec_per_reward_range"] = task.get("sec_per_reward_range", normalized["cabmi"]["sec_per_reward_range"])
+
+        if "feedback" in template:
+            normalized["feedback"].update(template.get("feedback", {}))
+
+        if "advanced" in template:
+            adv = template.get("advanced", {})
+            normalized["cabmi"]["f0_win"] = adv.get("f0_win", normalized["cabmi"]["f0_win"])
+            normalized["cabmi"]["load_calibration"] = adv.get("load_calibration", normalized["cabmi"]["load_calibration"])
+            normalized["random_stimulation"]["ihsi_mean"] = adv.get("random_stim_ihsi_mean", normalized["random_stimulation"]["ihsi_mean"])
+            normalized["random_stimulation"]["ihsi_range"] = adv.get("random_stim_ihsi_range", normalized["random_stimulation"]["ihsi_range"])
+
+        # Overlay new format sections.
+        for key, value in template.items():
+            if isinstance(value, dict) and key in normalized and isinstance(normalized[key], dict):
+                normalized[key].update(value)
+            else:
+                normalized[key] = value
+
+        normalized.setdefault("capabilities", copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE["capabilities"]))
+        return normalized
+
+    def load_template_into_gui(self, template):
+        self.current_template = copy.deepcopy(template)
+
+        self.template_name_var.set(template.get("display_name", template.get("template_name", "")))
+        self.template_description_var.set(template.get("description", ""))
+
+        self.template_notes_text.delete("1.0", "end")
+        self.template_notes_text.insert("1.0", template.get("notes", ""))
+
+        caps = template.get("capabilities", {})
+        for key, var in self.capability_vars.items():
+            var.set(bool(caps.get(key, False)))
+
+        self.rebuild_settings_tabs()
+        self.refresh_suggested_day()
+
+    def collect_template_from_gui(self, update_current=False):
+        template = copy.deepcopy(self.current_template)
+
+        template["display_name"] = self.template_name_var.get().strip()
+        template["description"] = self.template_description_var.get().strip()
+        template["notes"] = self.template_notes_text.get("1.0", "end").strip()
+        template["capabilities"] = {key: bool(var.get()) for key, var in self.capability_vars.items()}
+
+        for section, fields in self.setting_vars.items():
+            template.setdefault(section, {})
+            for key, var in fields.items():
+                template[section][key] = self.variable_value(var)
+
+        if update_current:
+            self.current_template = copy.deepcopy(template)
+
+        return template
 
     def save_template_overwrite(self):
         user, project = self.require_user_project()
@@ -633,49 +606,168 @@ class CaBMIConfigGUI(tk.Tk):
         if self.current_template_scope == "shared":
             messagebox.showinfo(
                 "Shared template",
-                "Shared templates are read-only. Use 'Save As New Template' instead.",
+                "Shared templates are read-only. Use Save As to create a project copy.",
             )
             return
 
-        label = self.template_var.get()
-        if label and ":" in label:
-            scope, name = label.split(":", 1)
-        else:
-            name = self.current_template_name
+        template = self.collect_template_from_gui(update_current=True)
+        name = self.current_template_name or self.slug_for_display(template.get("display_name", "template"))
 
-        if not name:
-            self.save_template_as_new()
+        try:
+            self.cm.save_project_template(user, project, name, template, overwrite=True)
+        except Exception as e:
+            messagebox.showerror("Save failed", str(e))
             return
 
-        settings = self.collect_settings_from_fields()
-        self.cm.save_project_template(user, project, name, settings, overwrite=True)
         self.refresh_templates()
         self.template_var.set(f"project:{name}")
-        self.log(f"Saved template: {name}")
+        self.log(f"Saved experiment template: {name}")
 
     def save_template_as_new(self):
         user, project = self.require_user_project()
         if not project:
             return
 
-        name = simpledialog.askstring("Save Template As", "New template name:")
+        suggested = self.slug_for_display(self.template_name_var.get() or "new_template")
+        name = simpledialog.askstring("Save Template As", "New template name:", initialvalue=suggested)
         if not name:
             return
 
-        settings = self.collect_settings_from_fields()
+        template = self.collect_template_from_gui(update_current=True)
 
         try:
-            self.cm.save_project_template(user, project, name, settings, overwrite=False)
+            self.cm.save_project_template(user, project, name, template, overwrite=False)
         except ValueError:
-            ok = messagebox.askyesno("Overwrite template?", f"Template '{name}' exists. Overwrite?")
-            if not ok:
+            overwrite = messagebox.askyesno("Template exists", f"Template '{name}' already exists. Overwrite?")
+            if not overwrite:
                 return
-            self.cm.save_project_template(user, project, name, settings, overwrite=True)
+            self.cm.save_project_template(user, project, name, template, overwrite=True)
+        except Exception as e:
+            messagebox.showerror("Save failed", str(e))
+            return
 
+        self.current_template_name = self.slug_for_display(name)
+        self.current_template_scope = "project"
         self.refresh_templates()
-        self.template_var.set(f"project:{name.lower().replace(' ', '_')}")
-        self.refresh_templates()
-        self.log(f"Saved new template: {name}")
+        self.template_var.set(f"project:{self.current_template_name}")
+        self.log(f"Saved new experiment template: {name}")
+
+    # ------------------------------------------------------------------
+    # Settings tabs
+    # ------------------------------------------------------------------
+
+    def rebuild_settings_tabs(self):
+        if self.settings_notebook is None:
+            return
+
+        for tab in self.settings_notebook.tabs():
+            self.settings_notebook.forget(tab)
+
+        self.setting_vars = {}
+
+        template = self.collect_template_from_gui(update_current=True) if hasattr(self, "template_notes_text") else self.current_template
+        capabilities = template.get("capabilities", {})
+
+        for key, active in capabilities.items():
+            if not active:
+                continue
+            if key not in CAPABILITY_LABELS:
+                continue
+            section_data = template.get(key, {})
+            self.add_settings_tab(key, CAPABILITY_LABELS[key], section_data)
+
+        # Always show custom tab, but keep it simple.
+        self.add_custom_tab(template.get("custom", {}))
+
+    def add_settings_tab(self, section_key, title, data):
+        frame = ttk.Frame(self.settings_notebook, padding=10)
+        self.settings_notebook.add(frame, text=title)
+
+        self.setting_vars[section_key] = {}
+
+        row = 0
+        for key, value in data.items():
+            ttk.Label(frame, text=key).grid(row=row, column=0, sticky="w", pady=3)
+
+            if isinstance(value, bool):
+                var = tk.BooleanVar(value=value)
+                widget = ttk.Checkbutton(frame, variable=var)
+                widget.grid(row=row, column=1, sticky="w", pady=3)
+            else:
+                var = tk.StringVar(value=self.value_to_string(value))
+                widget = ttk.Entry(frame, textvariable=var)
+                widget.grid(row=row, column=1, sticky="ew", pady=3)
+
+            self.setting_vars[section_key][key] = var
+            row += 1
+
+        frame.columnconfigure(1, weight=1)
+
+    def add_custom_tab(self, custom_data):
+        frame = ttk.Frame(self.settings_notebook, padding=10)
+        self.settings_notebook.add(frame, text="Custom")
+
+        ttk.Label(
+            frame,
+            text="Custom parameters as JSON. Use this for temporary or new parameters not yet in the GUI.",
+        ).pack(anchor="w", pady=(0, 5))
+
+        self.custom_json_text = tk.Text(frame, height=12, wrap="none")
+        self.custom_json_text.pack(fill="both", expand=True)
+        self.custom_json_text.insert("1.0", json.dumps(custom_data or {}, indent=2))
+
+    # ------------------------------------------------------------------
+    # Session config
+    # ------------------------------------------------------------------
+
+    def build_current_session_config(self):
+        user = self.user_var.get()
+        project = self.project_var.get()
+        animal = self.animal_var.get()
+
+        if not user:
+            raise ValueError("Select a user.")
+        if not project:
+            raise ValueError("Select a project.")
+        if not animal:
+            raise ValueError("Select an animal.")
+
+        template = self.collect_template_from_gui(update_current=True)
+
+        # Parse custom JSON.
+        if hasattr(self, "custom_json_text"):
+            try:
+                template["custom"] = json.loads(self.custom_json_text.get("1.0", "end").strip() or "{}")
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Custom JSON is invalid: {e}")
+
+        experiment_name = self.slug_for_display(template.get("display_name") or template.get("template_name") or "experiment")
+
+        # Ensure experiment record exists because ConfigManager requires it.
+        if not self.cm.get_experiment(user, project, experiment_name):
+            self.cm.save_experiment(
+                user,
+                project,
+                experiment_name=experiment_name,
+                description=template.get("description", ""),
+                notes=template.get("notes", ""),
+                overwrite=False,
+            )
+
+        return self.cm.build_session_config(
+            user_name=user,
+            project_name=project,
+            experiment_name=experiment_name,
+            animal_id=animal,
+            settings=template,
+            settings_template=self.current_template_name,
+            settings_scope=self.current_template_scope,
+            session_date=self.date_var.get(),
+            day=self.day_var.get() or None,
+            extra={
+                "session_notes": self.session_notes_text.get("1.0", "end").strip()
+            },
+        )
 
     def preview_session_config(self):
         try:
@@ -686,11 +778,10 @@ class CaBMIConfigGUI(tk.Tk):
 
         top = tk.Toplevel(self)
         top.title("Session Config Preview")
-        top.geometry("800x600")
+        top.geometry("850x650")
 
         text = tk.Text(top, wrap="none")
         text.pack(fill="both", expand=True)
-
         text.insert("1.0", json.dumps(config, indent=2))
         text.config(state="disabled")
 
@@ -705,19 +796,11 @@ class CaBMIConfigGUI(tk.Tk):
         session_id = config["session_id"]
 
         if self.cm.session_exists(self.user_var.get(), self.project_var.get(), session_id):
-            answer = messagebox.askyesnocancel(
+            overwrite = messagebox.askyesno(
                 "Session already exists",
-                (
-                    f"This session already exists:\n\n"
-                    f"{session_id}\n\n"
-                    "Yes = overwrite existing session_config.json\n"
-                    "No = cancel so you can change the day/session label\n"
-                    "Cancel = cancel"
-                ),
+                f"This session already exists:\n\n{session_id}\n\nOverwrite it?",
             )
-            if answer is True:
-                overwrite = True
-            else:
+            if not overwrite:
                 self.log(f"Save cancelled because session already exists: {session_id}")
                 return
 
@@ -731,159 +814,50 @@ class CaBMIConfigGUI(tk.Tk):
                 overwrite=overwrite,
             )
         except FileExistsError as e:
-            answer = messagebox.askyesno(
+            overwrite_file = messagebox.askyesno(
                 "File already exists",
-                f"{e}\n\nOverwrite the existing file?"
+                f"{e}\n\nOverwrite the existing file?",
             )
-            if not answer:
-                self.log("Save cancelled because file already exists.")
+            if not overwrite_file:
                 return
-
-            try:
-                path = self.cm.save_session_config(
-                    user_name=self.user_var.get(),
-                    project_name=self.project_var.get(),
-                    session_config=config,
-                    save_base_dir=Path(self.save_base_dir_var.get()),
-                    register=True,
-                    overwrite=True,
-                )
-            except Exception as e2:
-                messagebox.showerror("Save failed", str(e2))
-                return
-
+            path = self.cm.save_session_config(
+                user_name=self.user_var.get(),
+                project_name=self.project_var.get(),
+                session_config=config,
+                save_base_dir=Path(self.save_base_dir_var.get()),
+                register=True,
+                overwrite=True,
+            )
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
             return
 
-        if overwrite:
-            messagebox.showinfo("Session overwritten", f"Overwrote session config:\n{path}")
-            self.log(f"Overwrote session config: {path}")
-        else:
-            messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
-            self.log(f"Saved session config: {path}")
-
+        messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
+        self.log(f"Saved session config: {path}")
         self.refresh_suggested_day()
 
     # ------------------------------------------------------------------
-    # Settings helpers
+    # Helpers
     # ------------------------------------------------------------------
 
-    def load_settings_into_fields(self, settings):
-        self.current_settings = copy.deepcopy(settings)
+    def _combo_row(self, parent, label, var, callback, row):
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=4)
+        combo = ttk.Combobox(parent, textvariable=var, state="readonly")
+        combo.grid(row=row, column=1, sticky="ew", pady=4)
+        combo.bind("<<ComboboxSelected>>", callback)
+        return combo
 
-        task = settings.get("task", {})
-        feedback = settings.get("feedback", {})
-        advanced = settings.get("advanced", {})
-        paths = settings.get("paths", {})
-
-        self.frame_rate_var.set(str(task.get("frame_rate_hz", "")))
-        self.baseline_len_var.set(str(task.get("baseline_len_sec", "")))
-        self.bmi_len_var.set(str(task.get("bmi_len_sec", "")))
-        self.ensemble_count_var.set(str(task.get("ensemble_count", "")))
-        self.neurons_per_ensemble_var.set(str(task.get("neurons_per_ensemble", "")))
-
-        reward_range = task.get("sec_per_reward_range", ["", ""])
-        self.reward_min_var.set(str(reward_range[0]) if len(reward_range) > 0 else "")
-        self.reward_max_var.set(str(reward_range[1]) if len(reward_range) > 1 else "")
-
-        self.feedback_enabled_var.set(bool(feedback.get("enabled", False)))
-        self.arduino_com_var.set(str(feedback.get("arduino_com", "")))
-        self.arduino_baudrate_var.set(str(feedback.get("arduino_baudrate", "")))
-
-        self.save_data_var.set(bool(advanced.get("save", True)))
-        self.load_calibration_var.set(bool(advanced.get("load_calibration", False)))
-        self.f0_win_var.set(str(advanced.get("f0_win", "")))
-        self.ihsi_mean_var.set(str(advanced.get("random_stim_ihsi_mean", "")))
-        self.ihsi_range_var.set(str(advanced.get("random_stim_ihsi_range", "")))
-
-        self.slidebook_dir_var.set(str(paths.get("default_slidebook_dir", "")))
-
-    def collect_settings_from_fields(self):
-        settings = copy.deepcopy(self.current_settings)
-
-        settings.setdefault("task", {})
-        settings.setdefault("feedback", {})
-        settings.setdefault("advanced", {})
-        settings.setdefault("paths", {})
-
-        settings["task"]["frame_rate_hz"] = self._float_or_int(self.frame_rate_var.get())
-        settings["task"]["baseline_len_sec"] = self._float_or_int(self.baseline_len_var.get())
-        settings["task"]["bmi_len_sec"] = self._float_or_int(self.bmi_len_var.get())
-        settings["task"]["ensemble_count"] = self._int(self.ensemble_count_var.get())
-        settings["task"]["neurons_per_ensemble"] = self._int(self.neurons_per_ensemble_var.get())
-        settings["task"]["sec_per_reward_range"] = [
-            self._float_or_int(self.reward_min_var.get()),
-            self._float_or_int(self.reward_max_var.get()),
-        ]
-
-        settings["feedback"]["enabled"] = bool(self.feedback_enabled_var.get())
-        settings["feedback"]["arduino_com"] = self.arduino_com_var.get()
-        settings["feedback"]["arduino_baudrate"] = self._int(self.arduino_baudrate_var.get())
-
-        settings["advanced"]["save"] = bool(self.save_data_var.get())
-        settings["advanced"]["load_calibration"] = bool(self.load_calibration_var.get())
-        settings["advanced"]["f0_win"] = self._float_or_int(self.f0_win_var.get())
-        settings["advanced"]["random_stim_ihsi_mean"] = self._float_or_int(self.ihsi_mean_var.get())
-        settings["advanced"]["random_stim_ihsi_range"] = self._float_or_int(self.ihsi_range_var.get())
-
-        settings["paths"]["default_save_base_dir"] = self.save_base_dir_var.get()
-        settings["paths"]["default_slidebook_dir"] = self.slidebook_dir_var.get()
-
-        return settings
-
-    def build_current_session_config(self):
-        user = self.user_var.get()
-        project = self.project_var.get()
-        experiment = self.experiment_var.get()
-        animal = self.animal_var.get()
-
-        if not user:
-            raise ValueError("Select a user.")
-        if not project:
-            raise ValueError("Select a project.")
-        if not experiment:
-            raise ValueError("Select an experiment.")
-        if not animal:
-            raise ValueError("Select an animal.")
-
-        settings = self.collect_settings_from_fields()
-
-        label = self.template_var.get()
-        if label and ":" in label:
-            scope, name = label.split(":", 1)
-        else:
-            scope, name = self.current_template_scope, self.current_template_name
-
-        return self.cm.build_session_config(
-            user_name=user,
-            project_name=project,
-            experiment_name=experiment,
-            animal_id=animal,
-            settings=settings,
-            settings_template=name,
-            settings_scope=scope,
-            session_date=self.date_var.get(),
-            day=self.day_var.get() or None,
-            extra={
-                "session_notes": self.session_notes_text.get("1.0", "end").strip()
-                if hasattr(self, "session_notes_text") else ""
-            },
-        )
-
-    # ------------------------------------------------------------------
-    # Utility
-    # ------------------------------------------------------------------
+    def _entry_row(self, parent, label, var, row):
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=3)
+        entry = ttk.Entry(parent, textvariable=var)
+        entry.grid(row=row, column=1, sticky="ew", pady=3)
+        parent.columnconfigure(1, weight=1)
+        return entry
 
     def browse_save_base_dir(self):
         path = filedialog.askdirectory(title="Select save base directory")
         if path:
             self.save_base_dir_var.set(path)
-
-    def browse_slidebook_dir(self):
-        path = filedialog.askdirectory(title="Select Slidebook directory")
-        if path:
-            self.slidebook_dir_var.set(path)
 
     def require_user(self):
         user = self.user_var.get()
@@ -900,61 +874,57 @@ class CaBMIConfigGUI(tk.Tk):
             return None, None
         return user, project
 
-    def require_user_project_experiment(self):
-        user, project = self.require_user_project()
-        exp = self.experiment_var.get()
-        if user and project and not exp:
-            messagebox.showwarning("Missing experiment", "Select an experiment first.")
-            return user, project, None
-        return user, project, exp
-
-    def require_user_project_animal(self):
-        user, project = self.require_user_project()
-        animal = self.animal_var.get()
-        if user and project and not animal:
-            messagebox.showwarning("Missing animal", "Select an animal first.")
-            return user, project, None
-        return user, project, animal
-
-    def clear_project_dependent_fields(self):
-        self.clear_experiment_fields()
-        self.clear_animal_fields()
-        self.load_settings_into_fields(copy.deepcopy(DEFAULT_TEMPLATE))
-
-    def clear_experiment_fields(self):
-        self.exp_display_var.set("")
-        self.exp_description_var.set("")
-        if hasattr(self, "exp_notes_text"):
-            self.exp_notes_text.delete("1.0", "end")
-
-    def clear_animal_fields(self):
-        self.animal_id_var.set("")
-        self.sex_var.set("U")
-        self.genotype_var.set("")
-        if hasattr(self, "animal_notes_text"):
-            self.animal_notes_text.delete("1.0", "end")
-
     def log(self, msg):
         if hasattr(self, "status_text"):
             self.status_text.insert("end", f"{msg}\n")
             self.status_text.see("end")
 
     @staticmethod
-    def _int(value):
-        value = str(value).strip()
-        if value == "":
-            return 0
-        return int(float(value))
+    def slug_for_display(name):
+        name = str(name).strip().lower()
+        out = []
+        prev_underscore = False
+        for ch in name:
+            if ch.isalnum():
+                out.append(ch)
+                prev_underscore = False
+            else:
+                if not prev_underscore:
+                    out.append("_")
+                    prev_underscore = True
+        return "".join(out).strip("_") or "unnamed"
 
     @staticmethod
-    def _float_or_int(value):
-        value = str(value).strip()
-        if value == "":
-            return 0
-        x = float(value)
-        if x.is_integer():
-            return int(x)
-        return x
+    def value_to_string(value):
+        if isinstance(value, (list, dict)):
+            return json.dumps(value)
+        return str(value)
+
+    @staticmethod
+    def variable_value(var):
+        value = var.get()
+        if isinstance(var, tk.BooleanVar):
+            return bool(value)
+
+        s = str(value).strip()
+        if s == "":
+            return ""
+
+        # Try JSON first for lists/dicts.
+        if (s.startswith("[") and s.endswith("]")) or (s.startswith("{") and s.endswith("}")):
+            try:
+                return json.loads(s)
+            except Exception:
+                return s
+
+        # Try number conversion.
+        try:
+            x = float(s)
+            if x.is_integer():
+                return int(x)
+            return x
+        except ValueError:
+            return s
 
 
 if __name__ == "__main__":

@@ -46,7 +46,8 @@ DEFAULT_EXPERIMENT_TEMPLATE = {
     "capabilities": {
         "cabmi": True,
         "imaging": True,
-        "feedback": True,
+        "auditory_feedback": True,
+        "reward": True,
         "random_stimulation": True,
         "holography": False,
         "photopharm": False,
@@ -66,10 +67,16 @@ DEFAULT_EXPERIMENT_TEMPLATE = {
         "frame_rate_hz": 30,
         "slidebook_default_dir": "",
     },
-    "feedback": {
+    "auditory_feedback": {
+        "enabled": True,
+        "tone_frequency_hz": 7000,
+        "tone_duration_sec": 1,
+    },
+    "reward": {
         "enabled": True,
         "arduino_com": "COM3",
         "arduino_baudrate": 9600,
+        "reward_device": "solenoid",
     },
     "random_stimulation": {
         "enabled": True,
@@ -106,7 +113,8 @@ DEFAULT_EXPERIMENT_TEMPLATE = {
 CAPABILITY_LABELS = {
     "cabmi": "CaBMI",
     "imaging": "Imaging / Frequency",
-    "feedback": "Feedback",
+    "auditory_feedback": "Auditory feedback",
+    "reward": "Reward",
     "random_stimulation": "Random stimulation",
     "holography": "Holography",
     "photopharm": "Photopharm",
@@ -119,13 +127,14 @@ class CaBMIConfigGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("CaBMI Config GUI v5")
-        self.geometry("1200x850")
+        self.title("CaBMI Config GUI v7")
+        self.geometry("1350x850")
 
         self.cm = ConfigManager(CONFIG_ROOT)
         self.current_template = copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE)
         self.current_template_name = "default_cabmi"
         self.current_template_scope = "project"
+        self.previous_capabilities: dict[str, bool] = {}
 
         self.capability_vars: dict[str, tk.BooleanVar] = {}
         self.setting_vars: dict[str, dict[str, tk.Variable]] = {}
@@ -170,7 +179,7 @@ class CaBMIConfigGUI(tk.Tk):
         right = ttk.Frame(main, padding=6)
 
         main.add(left, weight=1)
-        main.add(right, weight=3)
+        main.add(right, weight=4)
 
         self._build_left_panel(left)
         self._build_right_panel(right)
@@ -197,27 +206,40 @@ class CaBMIConfigGUI(tk.Tk):
         ttk.Entry(select_box, textvariable=self.save_base_dir_var).grid(row=5, column=1, sticky="ew", pady=4)
         ttk.Button(select_box, text="Browse", command=self.browse_save_base_dir).grid(row=5, column=2, padx=4)
 
-        ttk.Button(select_box, text="Refresh day", command=self.refresh_suggested_day).grid(
+        ttk.Button(select_box, text="Refresh day", command=self.refresh_day_button_clicked).grid(
             row=6, column=1, sticky="e", pady=4
         )
 
-        ttk.Label(select_box, text="Session notes / log").grid(row=7, column=0, sticky="nw", pady=4)
-        self.session_notes_text = tk.Text(select_box, height=6, wrap="word")
-        self.session_notes_text.grid(row=7, column=1, columnspan=4, sticky="ew", pady=4)
-
         action_frame = ttk.Frame(select_box)
-        action_frame.grid(row=8, column=0, columnspan=5, sticky="e", pady=(8, 0))
-        ttk.Button(action_frame, text="Preview Session Config", command=self.preview_session_config).pack(side="left", padx=4)
+        action_frame.grid(row=7, column=0, columnspan=5, sticky="e", pady=(8, 4))
+        ttk.Button(action_frame, text="Preview Config", command=self.preview_session_config).pack(side="left", padx=4)
         ttk.Button(action_frame, text="Save Session Config", command=self.save_session_config).pack(side="left", padx=4)
         ttk.Button(action_frame, text="Launch CaBMI (not active yet)", state="disabled").pack(side="left", padx=4)
+
+        ttk.Label(select_box, text="Pre-session notes").grid(row=8, column=0, sticky="nw", pady=4)
+        self.session_notes_text = tk.Text(select_box, height=5, wrap="word")
+        self.session_notes_text.grid(row=8, column=1, columnspan=4, sticky="ew", pady=4)
+        self.session_notes_text.bind("<Tab>", self.focus_next_widget)
+        self.session_notes_text.bind("<Shift-Tab>", self.focus_previous_widget)
 
         for i in range(5):
             select_box.columnconfigure(i, weight=1)
 
         status_box = ttk.LabelFrame(parent, text="Status")
         status_box.pack(fill="both", expand=True, pady=8)
-        self.status_text = tk.Text(status_box, height=10, wrap="word")
-        self.status_text.pack(fill="both", expand=True)
+        status_frame = ttk.Frame(status_box)
+        status_frame.pack(fill="both", expand=True)
+
+        self.status_text = tk.Text(status_frame, height=10, wrap="word")
+        status_scroll = ttk.Scrollbar(status_frame, orient="vertical", command=self.status_text.yview)
+        self.status_text.configure(yscrollcommand=status_scroll.set)
+
+        self.status_text.pack(side="left", fill="both", expand=True)
+        status_scroll.pack(side="right", fill="y")
+
+        self.status_text.bind("<Tab>", self.focus_next_widget)
+        self.status_text.bind("<Shift-Tab>", self.focus_previous_widget)
+
         self.log("Select or create a user to begin.")
 
     def _build_right_panel(self, parent):
@@ -245,8 +267,6 @@ class CaBMIConfigGUI(tk.Tk):
         self.template_combo.bind("<<ComboboxSelected>>", self.on_template_changed)
 
         ttk.Button(parent, text="Load", command=self.load_selected_template).grid(row=0, column=2, padx=4)
-        ttk.Button(parent, text="Save", command=self.save_template_overwrite).grid(row=0, column=3, padx=4)
-        ttk.Button(parent, text="Save As", command=self.save_template_as_new).grid(row=0, column=4, padx=4)
 
         self._entry_row(parent, "Experiment/template name", self.template_name_var, 1)
         self._entry_row(parent, "Description", self.template_description_var, 2)
@@ -254,10 +274,17 @@ class CaBMIConfigGUI(tk.Tk):
         ttk.Label(parent, text="Notes").grid(row=3, column=0, sticky="nw", pady=3)
         self.template_notes_text = tk.Text(parent, height=3, wrap="word")
         self.template_notes_text.grid(row=3, column=1, columnspan=4, sticky="ew", pady=3)
+        self.template_notes_text.bind("<Tab>", self.focus_next_widget)
+        self.template_notes_text.bind("<Shift-Tab>", self.focus_previous_widget)
+
+        template_button_frame = ttk.Frame(parent)
+        template_button_frame.grid(row=4, column=1, columnspan=4, sticky="e", pady=(4, 8))
+        ttk.Button(template_button_frame, text="Save Template", command=self.save_template_overwrite).pack(side="left", padx=4)
+        ttk.Button(template_button_frame, text="Save As New Template", command=self.save_template_as_new).pack(side="left", padx=4)
 
         # Capabilities
         cap_frame = ttk.LabelFrame(parent, text="Capabilities")
-        cap_frame.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 3))
+        cap_frame.grid(row=5, column=0, columnspan=5, sticky="ew", pady=(8, 3))
 
         for idx, (key, label) in enumerate(CAPABILITY_LABELS.items()):
             var = tk.BooleanVar(value=False)
@@ -343,12 +370,29 @@ class CaBMIConfigGUI(tk.Tk):
             except Exception as e:
                 self.log(f"Could not update default template: {e}")
 
-    def refresh_suggested_day(self):
+    def refresh_suggested_day(self, log_change: bool = False):
         user, project, animal = self.user_var.get(), self.project_var.get(), self.animal_var.get()
         experiment_name = self.template_name_var.get() or self.current_template_name or "experiment"
+
         if user and project and animal:
-            self.day_var.set(self.cm.suggest_next_day(user, project, animal, experiment_name))
-            self.log(f"Suggested day: {self.day_var.get()}")
+            old_day = self.day_var.get()
+            new_day = self.cm.suggest_next_day(user, project, animal, experiment_name)
+            self.day_var.set(new_day)
+
+            if log_change and old_day and old_day != new_day:
+                self.log(f"Day automatically updated: {old_day} → {new_day}")
+
+    def refresh_day_button_clicked(self):
+        old_day = self.day_var.get()
+        self.refresh_suggested_day(log_change=False)
+        new_day = self.day_var.get()
+
+        if old_day == new_day:
+            self.log(f"Day checked: {new_day} is still the suggested day.")
+        elif old_day:
+            self.log(f"Day refreshed: {old_day} → {new_day}")
+        else:
+            self.log(f"Day set to suggested value: {new_day}")
 
     # ------------------------------------------------------------------
     # Change handlers
@@ -371,9 +415,24 @@ class CaBMIConfigGUI(tk.Tk):
         self.load_selected_template()
 
     def on_capabilities_changed(self):
+        current = {key: bool(var.get()) for key, var in self.capability_vars.items()}
+
+        for key, value in current.items():
+            previous = self.previous_capabilities.get(key)
+            if previous is None or previous == value:
+                continue
+
+            label = CAPABILITY_LABELS.get(key, key)
+            if value:
+                self.log(f"Enabled capability: {label}")
+            else:
+                self.log(f"Disabled capability: {label}")
+
+        self.previous_capabilities = current.copy()
+
         self.collect_template_from_gui(update_current=True)
         self.rebuild_settings_tabs()
-        self.refresh_suggested_day()
+        self.refresh_suggested_day(log_change=True)
 
     # ------------------------------------------------------------------
     # User/project creation
@@ -545,7 +604,12 @@ class CaBMIConfigGUI(tk.Tk):
             normalized["cabmi"]["sec_per_reward_range"] = task.get("sec_per_reward_range", normalized["cabmi"]["sec_per_reward_range"])
 
         if "feedback" in template:
-            normalized["feedback"].update(template.get("feedback", {}))
+            # Backward compatibility with old templates.
+            old_feedback = template.get("feedback", {})
+            normalized["reward"]["enabled"] = old_feedback.get("enabled", normalized["reward"]["enabled"])
+            normalized["reward"]["arduino_com"] = old_feedback.get("arduino_com", normalized["reward"]["arduino_com"])
+            normalized["reward"]["arduino_baudrate"] = old_feedback.get("arduino_baudrate", normalized["reward"]["arduino_baudrate"])
+            normalized["auditory_feedback"]["enabled"] = old_feedback.get("enabled", normalized["auditory_feedback"]["enabled"])
 
         if "advanced" in template:
             adv = template.get("advanced", {})
@@ -562,6 +626,13 @@ class CaBMIConfigGUI(tk.Tk):
                 normalized[key] = value
 
         normalized.setdefault("capabilities", copy.deepcopy(DEFAULT_EXPERIMENT_TEMPLATE["capabilities"]))
+
+        # Backward compatibility with old capability name.
+        if "feedback" in normalized.get("capabilities", {}):
+            old_value = bool(normalized["capabilities"].pop("feedback"))
+            normalized["capabilities"]["auditory_feedback"] = old_value
+            normalized["capabilities"]["reward"] = old_value
+
         return normalized
 
     def load_template_into_gui(self, template):
@@ -577,8 +648,12 @@ class CaBMIConfigGUI(tk.Tk):
         for key, var in self.capability_vars.items():
             var.set(bool(caps.get(key, False)))
 
+        self.previous_capabilities = {
+            key: bool(var.get()) for key, var in self.capability_vars.items()
+        }
+
         self.rebuild_settings_tabs()
-        self.refresh_suggested_day()
+        self.refresh_suggested_day(log_change=True)
 
     def collect_template_from_gui(self, update_current=False):
         template = copy.deepcopy(self.current_template)
@@ -765,7 +840,7 @@ class CaBMIConfigGUI(tk.Tk):
             session_date=self.date_var.get(),
             day=self.day_var.get() or None,
             extra={
-                "session_notes": self.session_notes_text.get("1.0", "end").strip()
+                "pre_session_notes": self.session_notes_text.get("1.0", "end").strip()
             },
         )
 
@@ -873,6 +948,14 @@ class CaBMIConfigGUI(tk.Tk):
             messagebox.showwarning("Missing project", "Select or create a project first.")
             return None, None
         return user, project
+
+    def focus_next_widget(self, event):
+        event.widget.tk_focusNext().focus()
+        return "break"
+
+    def focus_previous_widget(self, event):
+        event.widget.tk_focusPrev().focus()
+        return "break"
 
     def log(self, msg):
         if hasattr(self, "status_text"):

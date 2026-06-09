@@ -724,7 +724,7 @@ class ConfigManager:
         project_slug = _slug(project_name)
         user_slug = _slug(user_name)
 
-        session_id = f"{animal_id}_{experiment_slug}_{session_date}_{day}"
+        session_id = f"{project_slug}_{animal_id}_{experiment_slug}_{session_date}_{day}"
 
         config = {
             "session_id": session_id,

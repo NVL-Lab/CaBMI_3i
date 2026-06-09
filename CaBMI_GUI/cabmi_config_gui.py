@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
+import sys
 import tkinter as tk
 from datetime import date
 from pathlib import Path
@@ -127,7 +129,7 @@ class CaBMIConfigGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("CaBMI Config GUI v10")
+        self.title("CaBMI Config GUI v12")
         self.geometry("1350x850")
 
         self.cm = ConfigManager(CONFIG_ROOT)
@@ -240,7 +242,7 @@ class CaBMIConfigGUI(tk.Tk):
         action_frame.grid(row=7, column=0, columnspan=5, sticky="e", pady=(8, 4))
         ttk.Button(action_frame, text="Preview Config", command=self.preview_session_config).pack(side="left", padx=4)
         ttk.Button(action_frame, text="Save Config", command=self.save_session_config).pack(side="left", padx=4)
-        ttk.Button(action_frame, text="Launch CaBMI", state="disabled").pack(side="left", padx=4)
+        ttk.Button(action_frame, text="Launch CaBMI", command=self.launch_cabmi).pack(side="left", padx=4)
 
         ttk.Label(select_box, text="Pre-session notes").grid(row=8, column=0, sticky="nw", pady=4)
         self.session_notes_text = tk.Text(select_box, height=5, wrap="word")
@@ -437,8 +439,9 @@ class CaBMIConfigGUI(tk.Tk):
         if not (user and project and animal and day and session_date):
             return ""
 
+        project_slug = self.slug_for_display(project)
         experiment_slug = self.slug_for_display(experiment_name)
-        return f"{animal}_{experiment_slug}_{session_date}_{day}"
+        return f"{project_slug}_{animal}_{experiment_slug}_{session_date}_{day}"
 
     def update_day_status(self):
         user = self.user_var.get()
@@ -1022,12 +1025,18 @@ class CaBMIConfigGUI(tk.Tk):
         text.insert("1.0", summary)
         text.config(state="disabled")
 
-    def save_session_config(self):
+    def save_session_config_to_file(self, show_message: bool = True) -> Path | None:
+        """
+        Build and save the current session_config.json.
+
+        Returns the saved path, or None if the save was cancelled/failed.
+        This helper is used by both Save Config and Launch CaBMI.
+        """
         try:
             config = self.build_current_session_config()
         except Exception as e:
             messagebox.showerror("Cannot build session config", str(e))
-            return
+            return None
 
         overwrite = False
         session_id = config["session_id"]
@@ -1039,7 +1048,7 @@ class CaBMIConfigGUI(tk.Tk):
             )
             if not overwrite:
                 self.log(f"Save cancelled because session already exists: {session_id}")
-                return
+                return None
 
         try:
             path = self.cm.save_session_config(
@@ -1056,23 +1065,61 @@ class CaBMIConfigGUI(tk.Tk):
                 f"{e}\n\nOverwrite the existing file?",
             )
             if not overwrite_file:
-                return
-            path = self.cm.save_session_config(
-                user_name=self.user_var.get(),
-                project_name=self.project_var.get(),
-                session_config=config,
-                save_base_dir=Path(self.save_base_dir_var.get()),
-                register=True,
-                overwrite=True,
-            )
+                self.log("Save cancelled because file already exists.")
+                return None
+            try:
+                path = self.cm.save_session_config(
+                    user_name=self.user_var.get(),
+                    project_name=self.project_var.get(),
+                    session_config=config,
+                    save_base_dir=Path(self.save_base_dir_var.get()),
+                    register=True,
+                    overwrite=True,
+                )
+            except Exception as e2:
+                messagebox.showerror("Save failed", str(e2))
+                return None
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
-            return
+            return None
 
-        messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
+        if show_message:
+            messagebox.showinfo("Session saved", f"Saved session config:\n{path}")
+
         self.log(f"Saved session config: {path}")
         self.refresh_suggested_day()
         self.update_day_status()
+        return path
+
+    def save_session_config(self):
+        self.save_session_config_to_file(show_message=True)
+
+    def launch_cabmi(self):
+        """
+        Save the current config, then open the Run Session window.
+
+        The Run Session window currently runs dummy steps only.
+        Real CaBMI calls will be connected later.
+        """
+        path = self.save_session_config_to_file(show_message=False)
+        if path is None:
+            return
+
+        run_gui_path = Path(__file__).with_name("run_session_gui.py")
+        if not run_gui_path.exists():
+            messagebox.showerror(
+                "Run window not found",
+                f"Could not find run_session_gui.py next to this file:\n{run_gui_path}",
+            )
+            return
+
+        try:
+            subprocess.Popen([sys.executable, str(run_gui_path), str(path)])
+        except Exception as e:
+            messagebox.showerror("Launch failed", str(e))
+            return
+
+        self.log(f"Opened Run Session window for: {path}")
 
     # ------------------------------------------------------------------
     # Helpers

@@ -230,11 +230,10 @@ class CaBMIConfigGUI(tk.Tk):
 
         self._entry_row(select_box, "Date", self.date_var, 3)
 
-        ttk.Label(select_box, text="Day").grid(row=4, column=0, sticky="w", pady=4)
+        ttk.Label(select_box, text="Day number").grid(row=4, column=0, sticky="w", pady=4)
         day_frame = ttk.Frame(select_box)
         day_frame.grid(row=4, column=1, sticky="ew", pady=4)
-        day_frame.columnconfigure(0, weight=1)
-        ttk.Entry(day_frame, textvariable=self.day_var).grid(row=0, column=0, sticky="ew")
+        ttk.Spinbox(day_frame, from_=1, to=999, textvariable=self.day_var, width=6).grid(row=0, column=0, sticky="w")
         ttk.Label(day_frame, textvariable=self.day_status_var).grid(row=0, column=1, sticky="w", padx=(6, 0))
 
         ttk.Label(select_box, text="Save path").grid(row=5, column=0, sticky="w", pady=4)
@@ -411,14 +410,17 @@ class CaBMIConfigGUI(tk.Tk):
         if user and project and animal:
             old_day = self.day_var.get()
             new_day = self.cm.suggest_next_day(user, project, animal, experiment_name)
-            self.day_var.set(new_day)
+            self.day_var.set(new_day.replace("day_", ""))
             self.update_day_status()
 
             if log_change and old_day and old_day != new_day:
                 self.log(f"Day automatically updated: {old_day} → {new_day}")
 
     def on_day_changed(self, *args):
-        day = self.day_var.get()
+        try:
+            day = self.get_day_label()
+        except ValueError:
+            return "Day needs to be a number"
 
         # Avoid logging the same value repeatedly during programmatic refreshes.
         if day and day != self._last_logged_day:
@@ -426,6 +428,14 @@ class CaBMIConfigGUI(tk.Tk):
             self.log(f"Selected day: {day}")
 
         self.update_day_status()
+
+    def get_day_label(self):
+        raw = self.day_var.get().strip()
+
+        if not raw.isdigit():
+            raise ValueError("Day must be an integer, for example 1, 2, or 3.")
+
+        return f"day_{int(raw)}"
 
     def get_current_experiment_name(self):
         label = self.template_var.get()
@@ -439,9 +449,13 @@ class CaBMIConfigGUI(tk.Tk):
         user = self.user_var.get()
         project = self.project_var.get()
         animal = self.animal_var.get()
-        day = self.day_var.get()
         session_date = self.date_var.get()
         experiment_name = self.get_current_experiment_name()
+
+        try:
+            day = self.get_day_label()
+        except ValueError:
+            return " not a day"
 
         if not (user and project and animal and day and session_date):
             return ""
@@ -938,7 +952,7 @@ class CaBMIConfigGUI(tk.Tk):
             settings_template=self.current_template_name,
             settings_scope=self.current_template_scope,
             session_date=self.date_var.get(),
-            day=self.day_var.get() or None,
+            day=self.get_day_label(),
             extra={
                 "pre_session_notes": self.session_notes_text.get("1.0", "end").strip()
             },

@@ -1,29 +1,64 @@
 """
-Base definitions for CaBMI Run GUI step modules.
+Shared helpers for CaBMI Run GUI step modules.
 
-A step module may implement any of these functions:
-
-    build_panel(gui, parent, step) -> bool
-        Build a custom settings panel for this step. Return True if the custom
-        panel was rendered. Return False to let run_session_gui.py use the
-        generic settings panel from protocol_workflow.py.
-
-    run(gui, step, params) -> dict
-        Execute the step and return a JSON-serializable result dictionary.
-
-    load(gui, step, params) -> dict | None
-        Load previously generated output for this step. Return None if the user
-        cancelled the operation.
-
-The gui argument is the RunSessionGUI instance. This keeps future step modules
-powerful without forcing run_session_gui.py to know protocol-specific details.
+The Run GUI owns the window, workflow, state machine, logging, and completion
+logic. Step modules own the settings shown for one step and the run/load
+behavior for that step.
 """
 
 from __future__ import annotations
 
+from tkinter import filedialog, ttk
 from typing import Any
 
 
-def build_panel(gui: Any, parent: Any, step: dict[str, Any]) -> bool:
-    """Default: no custom panel; use the generic settings panel."""
-    return False
+SettingsSpec = dict[str, dict[str, Any]]
+
+
+def build_settings_panel(gui: Any, parent: Any, settings: SettingsSpec) -> bool:
+    """Render a normal step settings panel from a module-owned settings spec."""
+    if not settings:
+        ttk.Label(parent, text="No editable settings for this step.").grid(row=1, column=0, sticky="w")
+        return True
+
+    for row_index, (key, meta) in enumerate(settings.items(), start=1):
+        gui.add_step_setting_row(row_index, key, meta)
+    return True
+
+
+def collect_settings(gui: Any, settings: SettingsSpec) -> dict[str, Any]:
+    """Collect values from a module-owned settings spec and write editable values back to their sources."""
+    collected: dict[str, Any] = {}
+    for key, var in gui.step_setting_vars.items():
+        meta = settings.get(key, {})
+        value = gui.coerce_value(var.get(), meta.get("type", "str"))
+        collected[key] = value
+
+        source = meta.get("source")
+        if source and not meta.get("readonly"):
+            gui.deep_set(source, value)
+
+    return collected
+
+
+def placeholder_run(gui: Any, step: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+    """Default run behavior for steps whose backend is not connected yet."""
+    return {
+        "message": "Placeholder step completed. Backend function not connected yet.",
+        "step_id": step.get("id", ""),
+    }
+
+
+def default_load(gui: Any, step: dict[str, Any], params: dict[str, Any]) -> dict[str, Any] | None:
+    """Default load behavior for steps that can load a previous output file."""
+    path = filedialog.askopenfilename(
+        title=step.get("load_label", "Load output"),
+        filetypes=[("All files", "*.*")],
+    )
+    if not path:
+        return None
+
+    return {
+        "loaded_file": path,
+        "message": f"Loaded output for step: {step.get('name', step.get('id', 'unknown step'))}",
+    }

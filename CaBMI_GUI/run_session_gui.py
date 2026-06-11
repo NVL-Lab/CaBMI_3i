@@ -60,6 +60,7 @@ class RunSessionGUI(tk.Tk):
         self.runtime_state: dict[str, Any] = {}
         self.run_events: list[dict[str, Any]] = []
         self.step_setting_vars: dict[str, tk.Variable] = {}
+        self.step_setting_meta: dict[str, dict[str, Any]] = {}
 
         self._build_variables()
         self._build_layout()
@@ -401,6 +402,7 @@ class RunSessionGUI(tk.Tk):
         for child in self.settings_frame.winfo_children():
             child.destroy()
         self.step_setting_vars = {}
+        self.step_setting_meta = {}
         self.step_output_text.delete("1.0", "end")
 
         step_index, step = self.get_active_step()
@@ -456,6 +458,7 @@ class RunSessionGUI(tk.Tk):
         value = self.get_setting_value(meta)
         var = self.make_variable(meta.get("type", "str"), value)
         self.step_setting_vars[key] = var
+        self.step_setting_meta[key] = meta
 
         ttk.Label(self.settings_frame, text=label).grid(row=row_index, column=0, sticky="w", pady=4)
 
@@ -502,9 +505,15 @@ class RunSessionGUI(tk.Tk):
         _, step = self.get_active_step()
         if step is None:
             return {}
+
+        module = self.get_active_step_module(step)
+        collect_params = getattr(module, "collect_params", None)
+        if callable(collect_params):
+            return collect_params(self, step)
+
         collected = {}
         for key, var in self.step_setting_vars.items():
-            meta = (step.get("settings", {}) or {}).get(key, {})
+            meta = self.step_setting_meta.get(key, {})
             value = self.coerce_value(var.get(), meta.get("type", "str"))
             collected[key] = value
             source = meta.get("source")

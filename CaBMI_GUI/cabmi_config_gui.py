@@ -124,6 +124,13 @@ CAPABILITY_LABELS = {
     "external_trigger": "External trigger",
 }
 
+# Fields that may still exist in older templates/config files but should not be
+# edited in the Configuration GUI. These are runtime/session-specific values
+# that the Run GUI asks for when the relevant step is active.
+RUNTIME_ONLY_FIELDS = {
+    "imaging": {"slidebook_default_dir", "slidebook_data_dir", "slidebook_path", "slidebook_file"},
+}
+
 
 class CaBMIConfigGUI(tk.Tk):
     def __init__(self):
@@ -841,6 +848,9 @@ class CaBMIConfigGUI(tk.Tk):
         # Always show custom tab, but keep it simple.
         self.add_custom_tab(template.get("custom", {}))
 
+    def is_runtime_only_field(self, section_key: str, field_key: str) -> bool:
+        return field_key in RUNTIME_ONLY_FIELDS.get(section_key, set())
+
     def add_settings_tab(self, section_key, title, data):
         frame = ttk.Frame(self.settings_notebook, padding=10)
         self.settings_notebook.add(frame, text=title)
@@ -849,6 +859,9 @@ class CaBMIConfigGUI(tk.Tk):
 
         row = 0
         for key, value in data.items():
+            if self.is_runtime_only_field(section_key, key):
+                continue
+
             ttk.Label(frame, text=key).grid(row=row, column=0, sticky="w", pady=3)
 
             if isinstance(value, bool):
@@ -978,6 +991,8 @@ class CaBMIConfigGUI(tk.Tk):
             lines.append(label)
             lines.append("-" * 60)
             for k, v in section.items():
+                if self.is_runtime_only_field(section_key, k):
+                    continue
                 lines.append(f"{k}: {v}")
             lines.append("")
 

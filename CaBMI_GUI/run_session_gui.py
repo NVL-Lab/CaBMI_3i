@@ -24,8 +24,9 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
-from gui_config_adapter import build_main_protocol_runtime, make_json_safe
-from protocol_workflow import (
+from .gui_config_adapter import make_json_safe
+from .step_modules import get_step_module
+from .protocol_workflow import (
     build_steps_from_config,
     STATUS_LOCKED,
     STATUS_READY,
@@ -388,6 +389,10 @@ class RunSessionGUI(tk.Tk):
             return None, None
         return self.active_step_index, self.steps[self.active_step_index]
 
+    def get_active_step_module(self, step: dict[str, Any]):
+        """Return the plugin module responsible for this protocol step."""
+        return get_step_module(step.get("id", ""))
+
     # ------------------------------------------------------------------
     # Active step settings panel
     # ------------------------------------------------------------------
@@ -413,12 +418,14 @@ class RunSessionGUI(tk.Tk):
 
         ttk.Label(self.settings_frame, text=f"Status: {self.format_status(step['id'])}").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
 
-        settings = step.get("settings", {}) or {}
-        if not settings:
-            ttk.Label(self.settings_frame, text="No editable settings for this step.").grid(row=1, column=0, sticky="w")
-        else:
-            for row_index, (key, meta) in enumerate(settings.items(), start=1):
-                self.add_step_setting_row(row_index, key, meta)
+        module = self.get_active_step_module(step)
+        custom_panel_rendered = False
+        build_panel = getattr(module, "build_panel", None)
+        if callable(build_panel):
+            custom_panel_rendered = bool(build_panel(self, self.settings_frame, step))
+
+        if not custom_panel_rendered:
+            self.build_generic_step_settings_panel(step)
 
         previous_result = self.step_results.get(step["id"])
         if previous_result:
@@ -429,6 +436,20 @@ class RunSessionGUI(tk.Tk):
         self.load_step_button.configure(text=step.get("load_label") or "Load output")
         self.load_step_button.state(["!disabled"] if can_act and step.get("can_load", False) else ["disabled"])
         self.skip_step_button.state(["!disabled"] if can_act and step.get("can_skip", False) else ["disabled"])
+
+    def build_generic_step_settings_panel(self, step: dict[str, Any]):
+        """Render the default settings UI from step["settings"].
+
+        Step modules can override this by implementing build_panel(gui, parent, step)
+        and returning True.
+        """
+        settings = step.get("settings", {}) or {}
+        if not settings:
+            ttk.Label(self.settings_frame, text="No editable settings for this step.").grid(row=1, column=0, sticky="w")
+            return
+
+        for row_index, (key, meta) in enumerate(settings.items(), start=1):
+            self.add_step_setting_row(row_index, key, meta)
 
     def add_step_setting_row(self, row_index: int, key: str, meta: dict[str, Any]):
         label = meta.get("label", key)
@@ -587,18 +608,28 @@ class RunSessionGUI(tk.Tk):
         if not step.get("can_load", False):
             return
 
-        path = filedialog.askopenfilename(
-            title=step.get("load_label", "Load output"),
-            filetypes=[("All files", "*.*")],
-        )
-        if not path:
+        params = self.collect_active_step_settings()
+        module = self.get_active_step_module(step)
+        load_handler = getattr(module, "load", None)
+
+        if not callable(load_handler):
+            self.log(f"No load handler is available for step: {step['name']}")
             return
 
-        params = self.collect_active_step_settings()
-        result = {
-            "loaded_file": path,
-            "message": f"Loaded output for step: {step['name']}",
-        }
+        try:
+            result = load_handler(self, step, params)
+        except Exception as e:
+            self.set_step_status(step_index, STATUS_ERROR)
+            self.record_event(step, "error", {"error": str(e), "parameters_used": params})
+            self.log(f"ERROR loading output for step {step['name']}: {e}")
+            messagebox.showerror("Load failed", str(e))
+            self.render_active_step()
+            return
+
+        # A load handler can return None when the user cancels a popup/dialog.
+        if result is None:
+            return
+
         self.complete_step(step_index, COMPLETION_LOAD, result, params)
 
     def skip_active_step(self):
@@ -629,46 +660,11 @@ class RunSessionGUI(tk.Tk):
         self.unlock_next_step_if_needed(step_index)
 
     def dispatch_run_step(self, step: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
-        step_id = step["id"]
-        if step_id == "initialize_session":
-            return self.run_initialize_session(params)
-
-        # Placeholder until the real backend functions are connected.
-        return {
-            "message": "Placeholder step completed. Backend function not connected yet.",
-            "step_id": step_id,
-        }
-
-    def run_initialize_session(self, params: dict[str, Any]) -> dict[str, Any]:
-        if not self.session_config_path:
-            raise RuntimeError("No session_config.json loaded.")
-
-        # If the operator edited the Slidebook folder before initialization,
-        # write it into the in-memory config before building runtime_state.
-        slidebook_dir = params.get("slidebook_data_dir")
-        if slidebook_dir:
-            self.session_config.setdefault("settings_used", {}).setdefault("imaging", {})["slidebook_default_dir"] = slidebook_dir
-
-        self.runtime_state = build_main_protocol_runtime(
-            self.session_config,
-            self.session_config_path,
-            create_save_path=True,
-        )
-
-        errors = self.runtime_state.get("errors", [])
-        warnings = self.runtime_state.get("warnings", [])
-        for warning in warnings:
-            self.log(f"Warning: {warning}")
-        if errors:
-            # For now initialization should still block ROI steps if the
-            # Slidebook folder/save path is not valid.
-            raise RuntimeError("Initialization failed:\n" + "\n".join(errors))
-
-        self.write_runtime_config_used()
-        return {
-            "message": "Session initialized.",
-            "runtime_state": make_json_safe(self.runtime_state),
-        }
+        module = self.get_active_step_module(step)
+        run_handler = getattr(module, "run", None)
+        if not callable(run_handler):
+            raise RuntimeError(f"No run handler is available for step: {step['name']}")
+        return run_handler(self, step, params)
 
     # ------------------------------------------------------------------
     # Logging / output files

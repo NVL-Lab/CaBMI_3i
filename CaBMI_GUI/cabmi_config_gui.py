@@ -32,7 +32,7 @@ from datetime import date
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from config_manager import ConfigManager, DEFAULT_TEMPLATE
+from .config_manager import ConfigManager, DEFAULT_TEMPLATE
 
 
 # For testing:
@@ -1134,16 +1134,12 @@ class CaBMIConfigGUI(tk.Tk):
         if path is None:
             return
 
-        run_gui_path = Path(__file__).with_name("run_session_gui.py")
-        if not run_gui_path.exists():
-            messagebox.showerror(
-                "Run window not found",
-                f"Could not find run_session_gui.py next to this file:\n{run_gui_path}",
-            )
-            return
-
         try:
-            subprocess.Popen([sys.executable, str(run_gui_path), str(path)])
+            package_root = Path(__file__).resolve().parent.parent
+            subprocess.Popen(
+                [sys.executable, "-m", "CaBMI_GUI.run_session_gui", str(path)],
+                cwd=str(package_root),
+            )
         except Exception as e:
             messagebox.showerror("Launch failed", str(e))
             return

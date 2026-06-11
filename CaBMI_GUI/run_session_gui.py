@@ -78,6 +78,8 @@ class RunSessionGUI(tk.Tk):
         self.config_path_var = tk.StringVar(value="")
         self.active_step_name_var = tk.StringVar(value="No step selected")
         self.active_step_description_var = tk.StringVar(value="Load a session config to begin.")
+        self.developer_mode_var = tk.BooleanVar(value=False)
+        self.dev_warning_var = tk.StringVar(value="")
 
     def _build_layout(self):
         outer = ttk.Frame(self, padding=12)
@@ -85,6 +87,15 @@ class RunSessionGUI(tk.Tk):
 
         title = ttk.Label(outer, text="CaBMI Run Session", font=("Segoe UI", 16, "bold"))
         title.pack(anchor="w", pady=(0, 10))
+
+        self.dev_warning_label = tk.Label(
+            outer,
+            textvariable=self.dev_warning_var,
+            fg="red",
+            font=("Segoe UI", 10, "bold"),
+        )
+
+        self.dev_warning_label.pack(anchor="w")
 
         top = ttk.LabelFrame(outer, text="Session")
         top.pack(fill="x", pady=(0, 8))
@@ -115,6 +126,7 @@ class RunSessionGUI(tk.Tk):
     def _build_left_panel(self, parent):
         parent.rowconfigure(0, weight=3)
         parent.rowconfigure(1, weight=1)
+        parent.rowconfigure(2, weight=0)
         parent.columnconfigure(0, weight=1)
 
         steps_box = ttk.LabelFrame(parent, text="Protocol steps")
@@ -139,6 +151,16 @@ class RunSessionGUI(tk.Tk):
         self.run_notes_text.configure(yscrollcommand=notes_scroll.set)
         self.run_notes_text.pack(side="left", fill="both", expand=True)
         notes_scroll.pack(side="right", fill="y")
+
+        dev_frame = ttk.Frame(parent)
+        dev_frame.grid(row=2, column=0, sticky="ew", pady=(5, 0))
+
+        ttk.Checkbutton(
+            dev_frame,
+            text="Developer Mode",
+            variable=self.developer_mode_var,
+            command=self.on_developer_mode_changed,
+        ).pack(anchor="w")
 
     def _build_right_panel(self, parent):
         parent.rowconfigure(0, weight=0)
@@ -272,11 +294,24 @@ class RunSessionGUI(tk.Tk):
 
         self.update_row_controls(step_index)
 
+    def on_developer_mode_changed(self):
+        if self.developer_mode_var.get():
+            self.dev_warning_var.set(
+                "⚠ DEVELOPER MODE ENABLED - Locked workflow restrictions are disabled."
+            )
+            self.refresh_all_row_controls()
+        else:
+            self.dev_warning_var.set("")
+            self.refresh_all_row_controls()
+
     def select_step(self, step_index: int):
         if not (0 <= step_index < len(self.steps)):
             return
         status = self.step_status.get(self.steps[step_index]["id"], STATUS_LOCKED)
-        if status == STATUS_LOCKED:
+        if (
+                status == STATUS_LOCKED
+                and not self.developer_mode_var.get()
+        ):
             self.log(f"Step is locked: {self.steps[step_index]['name']}")
             return
         self.active_step_index = step_index
@@ -338,7 +373,8 @@ class RunSessionGUI(tk.Tk):
         if not row:
             return
         status = self.step_status.get(step["id"], STATUS_LOCKED)
-        row["step_button"].state(["!disabled"] if status != STATUS_LOCKED else ["disabled"])
+        can_select = (status != STATUS_LOCKED or self.developer_mode_var.get())
+        row["step_button"].state(["!disabled"] if can_select else ["disabled"])
         can_repeat = status in {STATUS_DONE, STATUS_SKIPPED, STATUS_ERROR, STATUS_NEEDS_RERUN} and step.get("can_repeat", True)
         row["repeat_button"].state(["!disabled"] if can_repeat else ["disabled"])
         row["status_var"].set(self.format_status(step["id"]))
@@ -388,7 +424,7 @@ class RunSessionGUI(tk.Tk):
         if previous_result:
             self.step_output_text.insert("end", json.dumps(make_json_safe(previous_result), indent=2))
 
-        can_act = status in {STATUS_READY, STATUS_NEEDS_RERUN, STATUS_ERROR}
+        can_act = (status in {STATUS_READY, STATUS_NEEDS_RERUN, STATUS_ERROR} or self.developer_mode_var.get())
         self.run_step_button.state(["!disabled"] if can_act and step.get("can_run", True) else ["disabled"])
         self.load_step_button.configure(text=step.get("load_label") or "Load output")
         self.load_step_button.state(["!disabled"] if can_act and step.get("can_load", False) else ["disabled"])
@@ -524,7 +560,7 @@ class RunSessionGUI(tk.Tk):
         step_index, step = self.get_active_step()
         if step is None:
             return
-        if self.step_status.get(step["id"]) == STATUS_LOCKED:
+        if self.step_status.get(step["id"]) == STATUS_LOCKED and not self.developer_mode_var.get():
             self.log(f"Cannot run locked step: {step['name']}")
             return
 

@@ -44,11 +44,12 @@ def main():
 
     # Storing path and environment data
     path_data = {
-        'sldy_path': Path(f"{exp_info['sldy_dir']}/{exp_info['sldy_name']}").expanduser().resolve(), # Make sure of existence before starting (w/ slidebook)
-        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}").expanduser().resolve(),
+        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['date']}/{exp_info['animal']}/{exp_info['day']}").expanduser().resolve(),
     }
+    path_data['sldy_path'] = path_data['save_path'] / 'slidebook'
+
     if task_set['save']:
-        path_data['save_path'].mkdir(parents=True, exist_ok=True)
+        path_data['sldy_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
     # Should create new slides per different day of experiment per mouse
@@ -57,9 +58,7 @@ def main():
     sb_access = SBAccess(s)
     slide_id = sb_access.CreateNewSlide() # Always 1
     sb_access.SetTargetSlide(slide_id)
-    #sb_access.SaveAsSlide(slide_id, r'F:\sbaccess') # access denied
-    #sb_access.SaveSlide(slide_id) # Cannot save slide
-    # Should find out how to remove the save slide warning
+    sb_access.SaveAsSlide(slide_id, str(path_data['sldy_path'] / exp_info['sldy_name'])) # access denied folder already exists
 
     '''
         ROI Acquisition: roi_acqnvs_3i

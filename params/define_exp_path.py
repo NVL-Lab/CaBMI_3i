@@ -21,7 +21,6 @@ def get_exp_info(exp_type: str = '') -> dict:
         exp_info['bmi_mat'] = '~/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BMI_online190930T152419.mat'
     else:
         exp_info['save_base_dir'] = 'F:cabmi/bmi_test'
-        exp_info['sldy_dir'] = 'F:cabmi/bmi_test/slidebook'
-        exp_info['sldy_name'] = 'capture_slide.sldy'
+        exp_info['sldy_name'] = f'{exp_info["animal"]}_{exp_info["date"]}'
 
     return exp_info

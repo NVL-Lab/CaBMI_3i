@@ -62,6 +62,8 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     z_plane = 0
     #print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id})')
     print('STARTING RECORDING!!!')
+    print(sb_access.)
+    exit()
     capture = sb_access.StartStreaming()  # Always 32768
     print(f'The image name for capture {capture}')
     while sb_access.IsStreaming():

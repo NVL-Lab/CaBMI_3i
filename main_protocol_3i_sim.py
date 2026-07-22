@@ -43,11 +43,12 @@ if __name__ == '__main__':
     # Storing path and environment data
     path_data = {
         'sldy_path': Path(f"{exp_info['sldy_dir']}/{exp_info['sldy_name']}").expanduser().resolve(), # Make sure of existence before starting (w/ slidebook)
-        'baseline_env': task_set['baseline_env'],
-        'bmi_env': task_set['bmi_env'],
-        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}").expanduser().resolve(),
+        #'baseline_env': task_set['baseline_env'],
+        #'bmi_env': task_set['bmi_env'],
+        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['date']}/{exp_info['animal']}/{exp_info['day']}").expanduser().resolve(),
         'test_dir': Path(exp_info['recording_onedrive_mac_dir'])
     }
+    path_data['sldy_path'] = path_data['save_path'] / 'slidebook'
     if task_set['save']:
         path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')

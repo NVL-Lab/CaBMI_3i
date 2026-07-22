@@ -52,6 +52,7 @@ def main():
         path_data['sldy_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
+    # Saves sldy in path
     # Should create new slides per different day of experiment per mouse
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((task_set['HOST'], task_set['PORT']))

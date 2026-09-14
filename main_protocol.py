@@ -2,6 +2,7 @@ __author__= 'Saul Gurgua Lopez'
 
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from params.play_tone import play_tone
 import serial
@@ -21,8 +22,6 @@ from bmi_acqnvs_3i import bmi_acqnvs_3i
 
 from check_motor_behavior import check_motor_behavior
 
-from simulation.load_mat_files import *
-
 """
     Performs data acquisition of calcium imaging through the use of a 3i microscope
 
@@ -31,13 +30,47 @@ from simulation.load_mat_files import *
         Suite2p (Image processing software): for ROI detection
 """
 
-if __name__ == '__main__':
+def confirm(prompt):
+    response = input(prompt)
+    return response == "" or response.lower() == "y"
+
+
+def choose_ensembles(neuron_max, ensemble_count, neurons_per_ensemble):
+    if ensemble_count != 2:
+        raise ValueError(
+            "The BMI protocol requires exactly two non-overlapping ensembles."
+        )
+
+    while True:
+        ensembles = []
+        for count in range(ensemble_count):
+            print(f"Selecting neuron ensemble {count + 1}")
+            ensemble = get_neuron_ensemble(neuron_max, neurons_per_ensemble)
+
+            if any(set(ensemble) & set(existing) for existing in ensembles):
+                print("Ensembles must not share neurons. Please start again.")
+                break
+
+            ensembles.append(ensemble)
+
+        if len(ensembles) == ensemble_count:
+            return ensembles
+
+
+def load_ensembles(strc_info):
+    selected = strc_info['e_base_sel']
+    ensemble_ids = strc_info['e_id']
+    return [
+        selected[ensemble_ids == 1].tolist(),
+        selected[ensemble_ids == 2].tolist(),
+    ]
+
+
+def main():
     # Acquire experiment settings
     exp_info = get_exp_info()
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
-    # Check if arduino is available, else return none maybe
-    a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
 
     # Storing path and environment data
     path_data = {
@@ -57,12 +90,11 @@ if __name__ == '__main__':
     # Should pass the recording to suite2p rather than creating a mean
     roi_info = get_roi_data(roi_bg, path_data, task_set, True)
 
-    cont = input("Acquire Baseline? [Y/y] ")
-    if cont == "" or cont.lower() == "y":
+    if confirm("Acquire Baseline? [Y/y] "):
         print("Acquiring Baseline...")
     else:
         print("Stopping...")
-        exit(0)
+        return
     '''
         Baseline Acquisition: baseline_acqnvs_3i
     '''
@@ -74,57 +106,82 @@ if __name__ == '__main__':
     neuron_max = roi_data['num_rois']
     base_activity, task_set = baseline_acqnvs_3i(task_set, path_data, roi_data['roi_mask'])
 
-    cont = input("Gather ROI info for BMI? [Y/y] ")
-    if cont == "" or cont.lower() == "y":
+    if confirm("Gather ROI info for BMI? [Y/y] "):
         print("Plotting neurons...")
     else:
         print("Stopping...")
-        exit(0)
+        return
     '''
         Ensemble neuron data
     '''
-    neuron_ensembles = []
+    if task_set['expt']['calib']['load']:
+        neuron_ensembles = None
+        frames_per_reward_range = None
+    else:
+        plot_neurons_baseline(base_activity, None, None, neuron_max)
+        neuron_ensembles = choose_ensembles(
+            neuron_max,
+            task_set['cb']['ensemble_count'],
+            task_set['cb']['neurons_per_ensemble'],
+        )
+        plot_neurons_ensemble(
+            base_activity,
+            neuron_ensembles[0] + neuron_ensembles[1],
+            [1] * len(neuron_ensembles[0]) + [2] * len(neuron_ensembles[1]),
+        )
+        select_roi_data(
+            roi_data,
+            list(set(neuron_ensembles[0]) | set(neuron_ensembles[1])),
+        )
+
+        baseline_frame_rate = (
+            np.sum(~np.isnan(base_activity[0, :]))
+            / task_set['cb']['baseline_len']
+        )
+        sec_per_reward_range = np.array(task_set['cb']['sec_per_reward_range'])
+        frames_per_reward_range = sec_per_reward_range * baseline_frame_rate
+        print('Time (s) per reward range:')
+        print(sec_per_reward_range)
+        print('Frames per reward range:')
+        print(frames_per_reward_range)
+        print('Reward per frame range:')
+        print(1. / frames_per_reward_range)
+
     while True:
-        if not task_set['expt']['calib']['load']:
-            plot_neurons_baseline(base_activity, None, None, neuron_max)
+        calibration_ensembles = neuron_ensembles or (None, None)
+        target_info, target_cal_all, fb_cal, strc_info = baseline2target(
+            base_activity,
+            roi_data,
+            calibration_ensembles[0],
+            calibration_ensembles[1],
+            frames_per_reward_range,
+            task_set,
+            path_data['save_path'],
+            fb_set,
+        )
+        if task_set['expt']['calib']['load']:
+            neuron_ensembles = load_ensembles(strc_info)
+            break
 
-            for count in range(task_set['cb']['ensemble_count']):
-                print(f"Selecting neuron ensemble {count+1}")
-                ensemble = get_neuron_ensemble(neuron_max, task_set['cb']['neurons_per_ensemble'])
-
-                if any(set(ensemble) & set(existing) for existing in neuron_ensembles):
-                    print("This ensemble shares neurons with a previous one. Try again.")
-                    neuron_ensembles = []
-                    continue
-                else:
-                    neuron_ensembles.append(ensemble)
-
-            if not neuron_ensembles:
-                continue
-
-            plot_neurons_ensemble(base_activity, neuron_ensembles[0] + neuron_ensembles[1], [1] * len(neuron_ensembles[0]) + [2] * len(neuron_ensembles[1]))
-            select_roi_data(roi_data, list(set(neuron_ensembles[0]) | set(neuron_ensembles[1])))
-
-            baseline_frame_rate = np.sum(~np.isnan(base_activity[0, :])) / task_set['cb']['baseline_len']  # task_set['im']['frame_rate']
-            sec_per_reward_range = np.array(task_set['cb']['sec_per_reward_range'])
-            frames_per_reward_range = sec_per_reward_range * baseline_frame_rate
-            print('Time (s) per reward range:')
-            print(sec_per_reward_range)
-            print('Frames per reward range:')
-            print(frames_per_reward_range)
-            print('Reward per frame range:')
-            print(1. / frames_per_reward_range)
-
-        target_info, target_cal_all, fb_cal, strc_info = baseline2target(base_activity, roi_data, neuron_ensembles[0], neuron_ensembles[1],
-                                                                         frames_per_reward_range, task_set,
-                                                                         path_data['save_path'], fb_set)
-        cont = input("Are ROIs good for BMI? [Y/y] ")
-        if cont == "" or cont.lower() == "y":
+        if confirm("Are ROIs good for BMI? [Y/y] "):
             print("Continuing...")
-        else:
-            print("Repeating...")
-            neuron_ensembles = []
-            continue
+            break
+
+        print("Repeating...")
+        neuron_ensembles = choose_ensembles(
+            neuron_max,
+            task_set['cb']['ensemble_count'],
+            task_set['cb']['neurons_per_ensemble'],
+        )
+        plot_neurons_ensemble(
+            base_activity,
+            neuron_ensembles[0] + neuron_ensembles[1],
+            [1] * len(neuron_ensembles[0]) + [2] * len(neuron_ensembles[1]),
+        )
+        select_roi_data(
+            roi_data,
+            list(set(neuron_ensembles[0]) | set(neuron_ensembles[1])),
+        )
 
     if isinstance(strc_info, np.lib.npyio.NpzFile):
         strc_mask = strc_info['strc_mask'].item()
@@ -137,12 +194,11 @@ if __name__ == '__main__':
     if not seed_base:
         vector_stim += task_set['f0_win']
 
-    cont = input("Acquire BMI? [Y/y]")
-    if cont == "" or cont.lower() == "y":
+    if confirm("Acquire BMI? [Y/y] "):
         print("Acquiring BMI...")
     else:
         print("Stopping...")
-        exit(0)
+        return
     '''
         BMI Acquisition
     '''
@@ -163,9 +219,34 @@ if __name__ == '__main__':
     plt.show()
     '''
 
-    base_val_seed = np.ones(len(neuron_ensembles[0]) + len(neuron_ensembles[1])) * np.nan
-    bmi_data = bmi_acqnvs_3i(task_set, path_data, exp_info['expt'], target_info, vector_stim,
-                             0, [], fb_set['fb_bool'], fb_cal, strc_mask, a, base_val_seed)
+    base_val_seed = np.ones(
+        len(neuron_ensembles[0]) + len(neuron_ensembles[1])
+    ) * np.nan
+    a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
+    try:
+        bmi_data = bmi_acqnvs_3i(
+            task_set,
+            path_data,
+            exp_info['expt'],
+            target_info,
+            vector_stim,
+            0,
+            [],
+            fb_set['fb_bool'],
+            fb_cal,
+            strc_mask,
+            a,
+            base_val_seed,
+        )
+    finally:
+        if a.is_open:
+            a.close()
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)
+
+    return bmi_data
+
+
+if __name__ == '__main__':
+    main()

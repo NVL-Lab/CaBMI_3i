@@ -3,10 +3,11 @@ from datetime import datetime
 def get_exp_info(exp_type: str = '') -> dict:
     # Experiment directories
     exp_info = {
+        'project': 'PFF',
         'animal': 'mouse0',
-        'day': 'D0',
-        'date': 260317,#datetime.today().strftime('%y%m%d'),
-        'expt': 'bmi_stim'
+        'experiment': 'bmi_stim',
+        'date': datetime.today().strftime('%Y%m%d'),
+        'day': 'D0'
     }
 
     if exp_type == 'sim':
@@ -17,10 +18,10 @@ def get_exp_info(exp_type: str = '') -> dict:
     elif exp_type == 'sim_mat':
         exp_info['save_base_dir'] = '~/Downloads/bmi_sim_mat'
         exp_info['roi_data_mat'] = '~/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/roi_data.mat'
-        exp_info['bdata_mat'] = '~/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BaselineOnline190930T132923.mat'
+        exp_info['bdata_mat'] = '~/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BaselineOnline190930T1show32923.mat'
         exp_info['bmi_mat'] = '~/Scripts/uab/nvl_lab/CaBMI/data/HoloBMI/Raw/190930/NVI12/D5/BMI_online190930T152419.mat'
     else:
-        exp_info['save_base_dir'] = 'F:cabmi/bmi_test'
+        exp_info['save_base_dir'] = 'F:/cabmi/bmi_test'
         exp_info['sldy_name'] = f'{exp_info["animal"]}_{exp_info["date"]}'
 
     return exp_info

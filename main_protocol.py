@@ -73,11 +73,13 @@ def main():
     fb_set = get_fb_settings()
 
     # Storing path and environment data
+    save_path = Path(exp_info['save_base_dir']) / exp_info['project'] / exp_info['animal'] / exp_info['experiment'] /exp_info['date'] / exp_info['day']
     path_data = {
-        #'sldy_path': Path(f"{exp_info['sldy_dir']}/{exp_info['sldy_name']}").expanduser().resolve(), # Make sure of existence before starting (w/ slidebook)
-        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['date']}/{exp_info['animal']}/{exp_info['day']}").expanduser().resolve(), # used to be animal, then date
+        'save_path': save_path.expanduser().resolve(),
+        'sldy_path': save_path / 'slidebook'
     }
-    path_data['sldy_path'] = path_data['save_path'] / 'slidebook'
+
+    # Creating save directory if it does not exist
     if task_set['save']:
         path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')

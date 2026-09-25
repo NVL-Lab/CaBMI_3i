@@ -68,7 +68,7 @@ def load_ensembles(strc_info):
 
 def main():
     # Acquire experiment settings
-    exp_info = get_exp_info()
+    exp_info = get_exp_info(experiment_type='experiment')
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
 

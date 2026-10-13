@@ -34,49 +34,58 @@ from simulation.load_mat_files import *
         Suite2p (Image processing software): for ROI detection
 """
 
+def confirm(prompt):
+    response = input(prompt)
+    return response == "" or response.lower() == "y"
+
 def main():
     # Acquire experiment settings
-    exp_info = get_exp_info()
+    exp_info = get_exp_info(user = 'Saul', experiment_type='experiment')
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
+
     # Check if arduino is available, else return none maybe
     #a = serial.Serial(fb_set['arduino']['com'], fb_set['arduino']['baudrate'])
 
     # Storing path and environment data
+    save_path = Path(exp_info['save_base_dir']) / exp_info['project'] / exp_info['animal'] / exp_info['experiment'] / \
+                exp_info['date'] / exp_info['day']
     path_data = {
-        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['date']}/{exp_info['animal']}/{exp_info['day']}").expanduser().resolve(),
+        'save_path': save_path.expanduser().resolve(),
+        'sldy_path': save_path / 'slidebook'
     }
-    path_data['sldy_path'] = path_data['save_path'] / 'slidebook'
 
+    # Creating save directory if it does not exist
     if task_set['save']:
         path_data['sldy_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
-    # Saves sldy in path
     # Should create new slides per different day of experiment per mouse
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((task_set['HOST'], task_set['PORT']))
-    sb_access = SBAccess(s)
-    slide_id = sb_access.CreateNewSlide() # Always 1
-    sb_access.SetTargetSlide(slide_id)
-    sb_access.SaveAsSlide(slide_id, str(path_data['sldy_path'] / exp_info['sldy_name'])) # access denied folder already exists
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((task_set['HOST'], task_set['PORT']))
+        sb_access = SBAccess(s)
+        slide_id = sb_access.CreateNewSlide()
+        sb_access.SetTargetSlide(slide_id)
+        sb_access.SaveAsSlide(
+            slide_id,
+            str(path_data['sldy_path'] / exp_info['sldy_name']) # access denied folder already exists
+        )
 
-    '''
-        ROI Acquisition: roi_acqnvs_3i
-            Capture the image and input the capture index
-    '''
-    cont = input("Acquire ROI background image? [Y/y] ")
-    if cont == "" or cont.lower() == "y":
-        print("Acquiring ROI background image...")
-    else:
-        print("Stopping...")
-        exit(0)
+        '''
+            ROI Acquisition: roi_acqnvs_3i
+                Capture the image and input the capture index
+        '''
+        if confirm("Acquire ROI background image? [Y/y] "):
+            print("Acquiring ROI background image...")
+        else:
+            print("Stopping...")
+            return
 
-    roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
-    s.close()
-    # Should pass the recording to suite2p rather than creating a mean
-    roi_info = get_roi_data(roi_bg, path_data, task_set, True)
-    exit()
+        roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
+        s.close()
+        # Should pass the recording to suite2p rather than creating a mean
+        roi_info = get_roi_data(roi_bg, path_data, task_set, True)
+        exit()
 
     cont = input("Acquire Baseline? [Y/y] ")
     if cont == "" or cont.lower() == "y":

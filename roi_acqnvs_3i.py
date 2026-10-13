@@ -67,7 +67,8 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
             test_info: dictionary containing dataframes with voltage data.
     """
     base_name = 'roi_bg'
-    task_set['roi']['recording_frames'] = int(np.ceil(task_set['im']['frame_rate'] * task_set['roi']['recording_len'])) # Actual microscope fps seems to be halved
+    #task_set['roi']['recording_frames'] = int(np.ceil(task_set['im']['frame_rate'] * task_set['roi']['recording_len'])) # Actual microscope fps seems to be halved
+    task_set['roi']['recording_frames'] = 100
     roi_bg_path = path_data['save_path'] / f'{base_name}_{task_set["im"]["chan_data"]["recording_chan"].lower().replace(" ", "")}.npy'
     print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
 
@@ -81,17 +82,14 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
             exit(1)
         return roi_bg, task_set
 
-    #task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
-    # Image details
-    #print(sb_access.GetNumXColumns(capture)) #400
-    #print(sb_access.GetNumYRows(capture)) #386
-    #print(sb_access.GetNumZPlanes(capture))
-    #roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
-    task_set['roi']['recording_frames'] = 100
-    #roi_bg = np.full((task_set['roi']['recording_frames'], 386, 400), np.nan)
-    roi_bg = np.full((task_set['roi']['recording_frames'], 386*400), np.nan)
+    # Creates an instance of slidebook reader
+    task_set['roi']['capture'] = wait_for_latest_capture(sb_access) #may not be needed if sb_access is already connected to the correct capture
+    task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
 
-    return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, {'type': 'default'})
+    roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)
+    #roi_bg = np.full((task_set['roi']['recording_frames'], 386, 400), np.nan)
+
+    return recording_acqnvs_3i_sbaccess(roi_bg, task_set['roi']['recording_frames'], task_set, sb_access, roi_bg_path, task_set['roi']['capture'], {'type': 'default'})
 
 def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
     roi_data_path = path_data['save_path'] / 'roi_info.npz'

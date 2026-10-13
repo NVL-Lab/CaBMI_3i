@@ -33,7 +33,7 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     """
     channel = task_set['im']['chan_data']['recording_chan']
     frame_counter = 0
-    prev_tp = -2
+    prev_tp = -1 #used to be -2
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
     total_process_time = 0
 
@@ -42,76 +42,99 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     else:
         save = task_set['expt']['bg']['save']
 
-    #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: #on_cleanup(image_path, image_data, save): # may want to change to another variable than roi_data_path and image_data/roi_data
-    # roi_bg_capture_id = sb_access.StartCapture('ROI_backgroung')
-    '''
-    # May need to save it in order to get info
-    capture = sb_access.GetNumCaptures() - 1  # I need to create another slide. Any open slides will not be recognized
-    positions = sb_access.GetNumPositions(capture) - 1  # What are positions
-    im_name = sb_access.GetImageName(capture)
-    plane_count = sb_access.GetNumZPlanes(capture)
-    z_plane = int(plane_count / 2)
-    
-    
-    print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id}) is {im_name}')
-    y = sb_access.GetXPosition(capture, positions)  # Y in sutter
-    x = sb_access.GetYPosition(capture, positions)  # X in sutter
-    z = sb_access.GetZPosition(capture, positions, z_plane)
-    print(x, y, z)
-    '''
-    z_plane = 0
-    #print(f'The image name for capture {capture} (ID: {roi_bg_streaming_id})')
     print('STARTING RECORDING!!!')
-    print(sb_access.)
-    exit()
-    capture = sb_access.StartStreaming()  # Always 32768
-    print(f'The image name for capture {capture}')
-    while sb_access.IsStreaming():
-        # Stops recording when buffer is full
-        if frame_counter >= frame_limit:
-            sb_access.StopStreaming() # not working
-            break
+    capture = sb_access.StartStreaming()
+    streaming = True
 
-        # Wait for the first image gathered to continue
-        while True:
-            #latest_tp = sb_access.GetNumTimepoints(capture) # Not like lastimagestreamed, may take longer
-            # Currently only misses two (maybe 1) frame
-            latest_tp = sb_access.GetLastImageStreamed(capture) # Is the index the actual position ot should i subtract one
-            if latest_tp >= 0 and latest_tp != prev_tp:
-                break
+    try:
+        width = sb_access.GetNumXColumns(capture)
+        height = sb_access.GetNumYRows(capture)
+        plane_count = sb_access.GetNumZPlanes(capture)
+        channel_count = sb_access.GetNumChannels(capture)
+        z_plane = plane_count // 2
 
-        # capture (0-n), position ( not montage = 0), timepoint, zplane num, channel, True for 2d array return
-        #image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp - 1, z_plane,
-                                                 #task_set['im']['chan_data'][channel],
-                                                 #True)
-        image = sb_access.ReadImagePlaneBuf(capture, 0, latest_tp, z_plane, 0) # No option for 2D array
+        channel_names = [
+            sb_access.GetChannelName(capture, channel_index)
+            for channel_index in range(channel_count)
+        ]
+        if channel not in channel_names:
+            raise ValueError(
+                f"Recording channel {channel!r} is not available; "
+                f"available channels: {channel_names}"
+            )
+        channel_index = channel_names.index(channel)
 
-        print(f'*** Time Point: {latest_tp}')
+        expected_pixels = width * height
+        if expt_info['type'] != 'baseline':
+            if image_data.ndim == 3:
+                if image_data.shape[1:] != (height, width):
+                    raise ValueError(
+                        f"image_data has shape {image_data.shape}; "
+                        f"expected (*, {height}, {width})"
+                    )
+            elif image_data.ndim == 2 and image_data.shape[1] != expected_pixels:
+                raise ValueError(
+                    f"image_data has shape {image_data.shape}; "
+                    f"expected (*, {expected_pixels}) for flat frames"
+                )
+            else:
+                raise ValueError(
+                    "image_data must have shape (frames, height, width) "
+                    "or (frames, height * width)"
+                )
 
-        start_time = time.perf_counter()
-        if expt_info['type'] == 'baseline':
-            # Store ROI data
-            unit_vals = get_roi(image, expt_info['strc_mask'])
-            image_data[:, frame_counter] = unit_vals
-        else:
-            # Store frame data
-            image_data[frame_counter] = image
+        while frame_counter < frame_limit:
+            if not sb_access.IsStreaming():
+                raise RuntimeError(
+                    "SlideBook stopped streaming before the requested "
+                    f"{frame_limit} frames were received"
+                )
 
-        frame_counter += 1
-        print(f'*** Frames captured: {frame_counter}')
+            latest_tp = sb_access.GetLastImageStreamed(capture)
+            if latest_tp < 0 or latest_tp == prev_tp:
+                time.sleep(0.001)
+                continue
 
-        elapsed_time = time.perf_counter() - start_time
-        total_process_time += elapsed_time
-        print(f'Execution time: {elapsed_time} seconds')
+            image = np.asarray(
+                sb_access.ReadImagePlaneBuf(
+                    capture, 0, latest_tp, z_plane, channel_index
+                )
+            )
+            if image.size != expected_pixels:
+                raise RuntimeError(
+                    f"Received {image.size} pixels for a "
+                    f"{width}x{height} frame"
+                )
+            image = image.reshape(height, width)
 
+            start_time = time.perf_counter()
+            if expt_info['type'] == 'baseline':
+                if 'strc_mask' not in expt_info:
+                    raise ValueError(
+                        "Baseline streaming requires expt_info['strc_mask']"
+                    )
+                unit_vals = get_roi(image, expt_info['strc_mask'])
+                image_data[:, frame_counter] = unit_vals
+            elif image_data.ndim == 3:
+                image_data[frame_counter] = image
+            else:
+                image_data[frame_counter] = image.reshape(-1)
 
-        if elapsed_time < frame_interval:
-            time.sleep(frame_interval - elapsed_time)
+            frame_counter += 1
+            prev_tp = latest_tp
+            elapsed_time = time.perf_counter() - start_time
+            total_process_time += elapsed_time
 
-        prev_tp = latest_tp
+            if elapsed_time < frame_interval:
+                time.sleep(frame_interval - elapsed_time)
 
-    print('Total processing time: {:.2f} seconds'.format(total_process_time))
-    return image_data, task_set
+        return image_data, task_set
+    finally:
+        if streaming:
+            sb_access.StopStreaming()
+        if save:
+            np.save(image_path, image_data, allow_pickle=True)
+        print('Total processing time: {:.2f} seconds'.format(total_process_time))
 
 def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image_path, capture, expt_info):
     """

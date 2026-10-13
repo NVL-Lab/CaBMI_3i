@@ -2,6 +2,7 @@ __author__= 'Saul Gurgua Lopez'
 
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from params.play_tone import play_tone
 
@@ -20,7 +21,7 @@ from bmi_acqnvs_3i import bmi_acqnvs_3i
 
 from check_motor_behavior import check_motor_behavior
 
-from simulation.load_mat_files import *
+from simulation.load_mat_files import load_roi_info, load_base_activity, load_target_info
 
 """
     Performs data acquisition of calcium imaging through the use of a 3i microscope
@@ -30,20 +31,23 @@ from simulation.load_mat_files import *
         Suite2p (Image processing software): for ROI detection
 """
 
-if __name__ == '__main__':
+def main():
     # Acquire experiment settings
-    exp_info = get_exp_info(exp_type='sim_mat')
+    exp_info = get_exp_info(experiment_type='sim_bruker')
     task_set = get_bmi_mat_settings(save=True)
     fb_set = get_fb_settings()
 
     # Storing path and environment data
+    save_path = Path(exp_info['save_base_dir']) / exp_info['project'] / exp_info['animal'] / exp_info['experiment'] /exp_info['date'] / exp_info['day']
     path_data = {
-        'sldy_path': Path(f"{exp_info['sldy_dir']}/{exp_info['sldy_name']}").expanduser().resolve(), # Make sure of existence before starting (w/ slidebook)
+        'save_path': save_path.expanduser().resolve(),
+        'sldy_path': save_path / 'slidebook',
+
         'baseline_env': task_set['baseline_env'],
         'bmi_env': task_set['bmi_env'],
-        'save_path': Path(f"{exp_info['save_base_dir']}/{exp_info['animal']}/{exp_info['date']}/{exp_info['day']}").expanduser().resolve(),
         'test_dir': Path(exp_info['recording_onedrive_mac_dir'])
     }
+
     if task_set['save']:
         path_data['save_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
@@ -62,7 +66,6 @@ if __name__ == '__main__':
         roi_data = roi_info['roi_data'].item()
     else:
         roi_data = roi_info['roi_data']
-
 
     neuron_max = roi_data['num_rois']
     base_activity, task_set = load_base_activity(task_set, exp_info)
@@ -150,3 +153,6 @@ if __name__ == '__main__':
 
     if motor_run:
         check_motor_behavior(task_set, path_data, 3, exp_info['expt'], False, False)
+
+if __name__ == '__main__':
+    main()

@@ -31,6 +31,24 @@ def wait_for_reader_with_latest_capture(file_path, wait_seconds=500):
     print("Giving up.")
     exit(1)
 
+def wait_for_latest_capture(sbaccess, wait_seconds=500):
+    for attempt in range(wait_seconds):
+        try:
+            curr_capture = sbaccess.GetNumLiveCaptures()-1
+            capture = curr_capture
+            for capture_look in range(wait_seconds):
+                if capture <= curr_capture:
+                    print('Finding Capture...')
+                    capture = sbaccess.GetNumLiveCaptures()-1
+                else:
+                    return capture
+        except Exception as e:
+            print(f'Unexpected error: {e}')
+            print('Exiting...')
+            break
+    print("Giving up.")
+    exit(1)
+
 def wait_for_reader_with_capture(file_path, capture, wait_seconds=500):
     for attempt in range(wait_seconds):
         if not file_path.exists():

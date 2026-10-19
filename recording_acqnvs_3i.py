@@ -83,6 +83,7 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
                     "or (frames, height * width)"
                 )
 
+        # THE ABOVE SEEMS TOO MUCH
         while frame_counter < frame_limit:
             if not sb_access.IsStreaming():
                 raise RuntimeError(

@@ -40,7 +40,7 @@ def confirm(prompt):
 
 def main():
     # Acquire experiment settings
-    exp_info = get_exp_info(user = 'Saul', experiment_type='experiment')
+    exp_info = get_exp_info(protocol='bmi', user = 'Saul')
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
 
@@ -60,7 +60,7 @@ def main():
         path_data['sldy_path'].mkdir(parents=True, exist_ok=True)
     print('\nData Paths:\n', path_data, '\n')
 
-    # Should create new slides per different day of experiment per mouse
+    # Should create new slides per different day of experiment per mouse to prevent overwriting of previous data
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((task_set['HOST'], task_set['PORT']))
         sb_access = SBAccess(s)
@@ -82,9 +82,9 @@ def main():
             return
 
         roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
-        s.close()
         # Should pass the recording to suite2p rather than creating a mean
         roi_info = get_roi_data(roi_bg, path_data, task_set, True)
+        s.close()
         exit()
 
     cont = input("Acquire Baseline? [Y/y] ")

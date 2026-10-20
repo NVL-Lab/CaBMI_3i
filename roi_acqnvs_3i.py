@@ -83,7 +83,7 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
         return roi_bg, task_set
 
     # Creates an instance of slidebook reader
-    task_set['roi']['capture'] = wait_for_latest_capture(sb_access) #may not be needed if sb_access is already connected to the correct capture
+    #task_set['roi']['capture'] = wait_for_latest_capture(sb_access) #may not be needed if sb_access is already connected to the correct capture
     task_set = get_recording_settings(sb_access, task_set['roi']['capture'], task_set)
 
     roi_bg = np.full((task_set['roi']['recording_frames'], task_set['im']['resolution'][1], task_set['im']['resolution'][0]), np.nan)

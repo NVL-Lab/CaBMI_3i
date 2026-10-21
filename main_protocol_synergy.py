@@ -82,9 +82,9 @@ def main():
             return
 
         roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
-        s.close()
         # Should pass the recording to suite2p rather than creating a mean
         roi_info = get_roi_data(roi_bg, path_data, task_set, True)
+        sb_access.close()
         exit()
 
     cont = input("Acquire Baseline? [Y/y] ")

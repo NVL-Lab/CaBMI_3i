@@ -47,8 +47,6 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
     streaming = True
 
     try:
-        width = sb_access.GetNumXColumns(capture)
-        height = sb_access.GetNumYRows(capture)
         plane_count = sb_access.GetNumZPlanes(capture)
         channel_count = sb_access.GetNumChannels(capture)
         z_plane = plane_count // 2
@@ -57,69 +55,36 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
             sb_access.GetChannelName(capture, channel_index)
             for channel_index in range(channel_count)
         ]
-        if channel not in channel_names:
-            raise ValueError(
-                f"Recording channel {channel!r} is not available; "
-                f"available channels: {channel_names}"
-            )
-        channel_index = channel_names.index(channel)
 
-        expected_pixels = width * height
-        if expt_info['type'] != 'baseline':
-            if image_data.ndim == 3:
-                if image_data.shape[1:] != (height, width):
-                    raise ValueError(
-                        f"image_data has shape {image_data.shape}; "
-                        f"expected (*, {height}, {width})"
-                    )
-            elif image_data.ndim == 2 and image_data.shape[1] != expected_pixels:
-                raise ValueError(
-                    f"image_data has shape {image_data.shape}; "
-                    f"expected (*, {expected_pixels}) for flat frames"
-                )
-            else:
-                raise ValueError(
-                    "image_data must have shape (frames, height, width) "
-                    "or (frames, height * width)"
-                )
+        # look if i can turn on a pmt HERE
 
-        # THE ABOVE SEEMS TOO MUCH
         while frame_counter < frame_limit:
             if not sb_access.IsStreaming():
                 raise RuntimeError(
-                    "SlideBook stopped streaming before the requested "
+                    "SlideBook quit streaming unexpectedly; "
                     f"{frame_limit} frames were received"
                 )
 
-            latest_tp = sb_access.GetLastImageStreamed(capture)
+            # GetLastImageStreamed returns the next time point to be streamed, so subtract 1 to get the last time point that was actually streamed
+            latest_tp = sb_access.GetLastImageStreamed(capture) - 1
             if latest_tp < 0 or latest_tp == prev_tp:
                 time.sleep(0.001)
                 continue
 
             image = np.asarray(
                 sb_access.ReadImagePlaneBuf(
-                    capture, 0, latest_tp, z_plane, channel_index
+                    capture, 0, latest_tp, z_plane, task_set['im']['chan_data'][channel], True
                 )
             )
-            if image.size != expected_pixels:
-                raise RuntimeError(
-                    f"Received {image.size} pixels for a "
-                    f"{width}x{height} frame"
-                )
-            image = image.reshape(height, width)
 
             start_time = time.perf_counter()
             if expt_info['type'] == 'baseline':
-                if 'strc_mask' not in expt_info:
-                    raise ValueError(
-                        "Baseline streaming requires expt_info['strc_mask']"
-                    )
+                # Store frame data
                 unit_vals = get_roi(image, expt_info['strc_mask'])
                 image_data[:, frame_counter] = unit_vals
-            elif image_data.ndim == 3:
-                image_data[frame_counter] = image
             else:
-                image_data[frame_counter] = image.reshape(-1)
+                # Store frame data
+                image_data[frame_counter] = image
 
             frame_counter += 1
             prev_tp = latest_tp
@@ -130,6 +95,7 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
                 time.sleep(frame_interval - elapsed_time)
 
         return image_data, task_set
+
     finally:
         if streaming:
             sb_access.StopStreaming()

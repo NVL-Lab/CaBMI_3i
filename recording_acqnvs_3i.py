@@ -56,8 +56,6 @@ def recording_acqnvs_3i_sbaccess(image_data, frame_limit, task_set, sb_access, i
             for channel_index in range(channel_count)
         ]
 
-        # look if i can turn on a pmt HERE
-
         while frame_counter < frame_limit:
             if not sb_access.IsStreaming():
                 raise RuntimeError(

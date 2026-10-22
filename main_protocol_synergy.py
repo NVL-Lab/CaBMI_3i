@@ -81,67 +81,6 @@ def main():
             print("Stopping...")
             return
 
-        frame_limit = 100
-        frame_counter = 0
-        channel_count = 2
-        sb_rec_frames = 1 # The number of frames Slidebook will record per acquisition.
-        save = True
-        print('STARTING RECORDING!!!')
-        sb_access.FocusWindowStreamSetNumberFrames(sb_rec_frames)
-        capture = sb_access.StartStreaming()
-        streaming = True
-
-        try:
-            # Assures that the streaming has started and that the first frame has been captured
-            while True:
-                res = sb_access.IsStreaming()
-                last_capture = sb_access.GetLastImageStreamed(capture)
-                if (res and last_capture >= 0):
-                    break
-
-            # Assures that the number of channels in the capture matches the expected number of channels
-            sb_channel_count = sb_access.GetNumChannels(capture)
-            if sb_channel_count != channel_count:
-                raise RuntimeError(
-                    "Incorrect number of channels; "
-                    f"Expected {channel_count}, got {sb_channel_count}"
-                )
-
-            # Creates a list of numpy arrays to store the image data for each channel
-            rows = sb_access.GetNumYRows(capture)
-            cols = sb_access.GetNumXColumns(capture)
-            #image_data = [np.full((frame_limit, rows, cols), np.nan) for _ in range(sb_channel_count)]
-            image_data = {sb_access.GetChannelName(capture, channel_index).lower().replace(" ", ""): np.full((frame_limit, rows, cols), np.nan) for channel_index in range(sb_channel_count)}
-            channel_names = image_data.keys()
-            capture_indexes = []
-
-            # Assures that the number of frames captured matches the expected number of frames
-            while last_capture < frame_limit:
-                prev_capture = last_capture
-                last_capture = sb_access.GetLastImageStreamed(capture)
-
-                # Captures have to be sequential
-                if last_capture == prev_capture:
-                    continue
-                capture_indexes.append(last_capture)
-                if 'rpmt' in channel_names:
-                    image_data['rpmt'][frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index('rpmt'), True)
-                # Need to make sure capture of each frame is the same, otherwise, the frame counter will be off and the data will be misaligned
-                # just take into account the red channel and gather the corresponding green channel data for the same frame
-                #for channel_index in range(sb_channel_count):
-                #    image_data[channel_index][frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_index,True)
-                frame_counter += 1
-                print(f'*** Countdown: {frame_limit-frame_counter}')
-
-        except KeyboardInterrupt:
-            print('Keyboard Interrupt')
-        finally:
-            if save:
-                for channel_index in range(sb_channel_count):
-                    np.save(path_data['save_path'] / f'roi_bg_{sb_access.GetChannelName(capture, channel_index).lower().replace(" ", "")}.npy', image_data[channel_index], allow_pickle=True)
-            if streaming:
-                sb_access.StopStreaming()
-
 
         #roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
         # Should pass the recording to suite2p rather than creating a mean

@@ -39,18 +39,21 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
 
         # Imaging
         'im': {
-            'resolution': res,    # Standard, but subject to change based on microscope operation
-            'frame_rate': fr,
+            # remove res
+            #'resolution': res,    # Standard, but subject to change based on microscope operation
+            'fs': fr,
+            'frames_to_average': 1, # Number of frames to average for each time point
+            'time_sec': 60,  # sec
             'zoom': 1.5,          # Zoom to obtain cells
             'posz': 0,            # Position of Z if known
-            'chan_data': {
-                'recording_chan': rec # Standard, but subject to change based on microscope operation
-            }
+            #'chan_data': {
+            #    'recording_chan': rec # Standard, but subject to change based on microscope operation
+            #}
+            'roi_channel': rec
         },
 
         # Regions of Interest (ROIs)
         'roi': {
-            'recording_len': 60,  # sec
             'template_diam': 3,  # Diameter of difference of Gaussians in pixels
             'thres': 0.5,        # Cell detection threshold as correlation coefficient
             'cell_diam': 17,     # CELL_DIAM is diameter used for dilation.

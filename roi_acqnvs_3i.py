@@ -238,13 +238,28 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
     frame_limit = int(np.ceil(task_set['im']['fs'] * task_set['im']['time_sec']))
     roi_channel = np.ceil(task_set['im']['roi_channel'])
     roi_bg_path = path_data['save_path'] / f'roi_bg_{roi_channel.lower().replace(" ", "")}.npy'
+
     save = task_set['im']['save'] # need to add
     frame_counter = 0
 
+    sb_access.GetMicroscopeState()
+    if task_set['im']['xy'] is not None:
+        sb_access.GetIsHardwareComponentEnabled(sb_access.MicroscopeHardwareComponent().XYZStage)
+        sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().XYZStage, *task_set['im']['xy'])
+        sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().ZStage, *task_set['im']['z']) # AuxZStage
+        sb_access.GetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTController1())
+        sb_access.GetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTController2())
+        sb_access.SetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTcontroller1(), 1)
+        sb_access.SetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTcontroller2(), 1)
+        sb_access.SetMagnification(task_set['im']['magnification'])
+        #print(sb_access.GetSystemFluorDefs())
+
+    #x = theSbAccess.GetXPosition(0, 0)
     print('STARTING RECORDING!!!')
     sb_access.FocusWindowStreamSetNumberFrames(task_set['im']['frames_to_average'])
     capture = sb_access.StartStreaming()
     streaming = True
+    capturing = False
 
     try:
         # Assures that the streaming has started and that the first frame has been captured
@@ -282,18 +297,33 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
 
             image_data[frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), True)
 
+            if not capturing:
+                capturing = True
             frame_counter += 1
             print(f'*** Countdown: {frame_limit - frame_counter}')
             print(f'Elapsed time: {sb_access.GetElapsedTime(capture, last_capture)} msec')  # This is just to ensure that the elapsed time is being updated
     finally:
         if streaming:
             sb_access.StopStreaming()
-        if save:
+        if save and capturing:
             np.save(roi_bg_path, image_data, allow_pickle=True)
+            if sb_access.GetIsSlideModified():
+                sb_access.SaveSlide()
+                print(f"{sb_access.ImageName(capture)} saved to {sb_access.GetTargetSlide()}")
+
+    print("Streamed successfully!")
+    width, height, um_per_pixel, camera_name, result = sb_access.GetCameraProperties(-1)
+
+    print("Properties of acquisition:")
+    print("Camera Name: ", camera_name)
+    print(f"Camera Resolution: ({width},{height})")
+    print("Microns per pixel: ", um_per_pixel)
+    print("Lens Name: ", sb_access.GetLensName(capture))
+    print("Magnification: ", sb_access.GetMagnification(capture))
 
     n = sb_access.GetNumTimepoints(capture)
     fps = (n-1) / ((sb_access.GetElapsedTime(capture, n - 1) - sb_access.GetElapsedTime(capture, 0))/1000.0)
-    print("Actual frame rate: ", fps)
+    print("Frame rate: ", fps)
 
     task_set['im']['capture'] = capture
     task_set['im']['shape'] = image_data.shape

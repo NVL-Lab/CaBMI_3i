@@ -71,6 +71,15 @@ def main():
             str(path_data['sldy_path'] / exp_info['sldy_name']) # access denied folder already exists
         )
 
+        # Check if all hardware components are enabled. May only want to check for the components that are needed for the experiment
+        for hardware_component in range (46):
+            try:
+                hardware_enabled = sb_access.GetIsHardwareComponentEnabled(hardware_component)
+                hardware_name = sb_access.GetHardwareComponentName(hardware_component)
+                print("Component", hardware_component + 1, "name  = ", hardware_name + f"enabled =  {'yes' if hardware_enabled else 'no'}")
+            except:
+                print("Component", hardware_component + 1, "is not supported")
+
         '''
             ROI Acquisition: roi_acqnvs_3i
                 Capture the image and input the capture index
@@ -82,7 +91,7 @@ def main():
             return
 
 
-        #roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
+        roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
         # Should pass the recording to suite2p rather than creating a mean
         #roi_info = get_roi_data(roi_bg, path_data, task_set, True)
         sb_access.CloseSlide(sb_access.GetTargetSlide(), True) # slide_id should be the same as sb_access.GetTargetSlide()

@@ -221,6 +221,8 @@ def get_bmi_mat_settings(fr: float = 29.752, res: Tuple[int, int] = (512, 512), 
 
         # Imaging
         'im': {
+            'xy': None,          # Position of XY if known
+            'z': None,           # Position of Z if known
             'resolution': res,    # Standard, but subject to change based on microscope operation
             'frame_rate': fr,
             'zoom': 1.5,          # Zoom to obtain cells

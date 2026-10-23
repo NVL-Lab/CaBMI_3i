@@ -11,7 +11,7 @@ import serial
 import time
 
 from params.play_tone import play_tone
-from slidebook.SBAccess import SBAccess, MicroscopeHardwareComponent
+from slidebook.SBAccess import SBAccess, MicroscopeHardwareComponent, MicroscopeStates
 
 from roi_acqnvs_3i import get_roi_bg, get_roi_data, get_roi_bg_sbaccess
 from params.define_exp_path import get_exp_info

@@ -1,5 +1,9 @@
 __author__= 'Saul Gurgua Lopez'
 
+import os
+import sys
+sys.path.insert(0, os.path.join(os.getcwd(), 'slidebook'))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import socket
@@ -7,7 +11,7 @@ import serial
 import time
 
 from params.play_tone import play_tone
-from slidebook.SBAccess import *
+from slidebook.SBAccess import SBAccess, MicroscopeHardwareComponent
 
 from roi_acqnvs_3i import get_roi_bg, get_roi_data, get_roi_bg_sbaccess
 from params.define_exp_path import get_exp_info
@@ -64,6 +68,7 @@ def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((task_set['HOST'], task_set['PORT']))
         sb_access = SBAccess(s)
+
         slide_id = sb_access.CreateNewSlide()
         sb_access.SetTargetSlide(slide_id)
         sb_access.SaveAsSlide(
@@ -72,13 +77,16 @@ def main():
         )
 
         # Check if all hardware components are enabled. May only want to check for the components that are needed for the experiment
-        for hardware_component in range (46):
+        for component in MicroscopeHardwareComponent:
+            print("Component: ", component.name)
             try:
-                hardware_enabled = sb_access.GetIsHardwareComponentEnabled(hardware_component)
-                hardware_name = sb_access.GetHardwareComponentName(hardware_component)
-                print("Component", hardware_component + 1, "name  = ", hardware_name + f"enabled =  {'yes' if hardware_enabled else 'no'}")
-            except:
-                print("Component", hardware_component + 1, "is not supported")
+                if component.name in ['ExcitationFilterWheel', 'FilterTurret', 'EmissionFilterWheel',
+                                      'FluorescenceShutter']:
+                    print(f"Name: {sb_access.GetHardwareComponentName(component)}")
+            except Exception as e:
+                print(e)
+            finally:
+                print(f"Enabled:  {'yes' if sb_access.GetIsHardwareComponentEnabled(component) else 'no'}\n")
 
         '''
             ROI Acquisition: roi_acqnvs_3i

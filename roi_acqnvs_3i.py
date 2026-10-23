@@ -244,17 +244,12 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
 
     sb_access.GetMicroscopeState()
     if task_set['im']['xy'] is not None:
-        sb_access.GetIsHardwareComponentEnabled(sb_access.MicroscopeHardwareComponent().XYZStage)
         sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().XYZStage, *task_set['im']['xy'])
         sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().ZStage, *task_set['im']['z']) # AuxZStage
-        sb_access.GetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTController1())
-        sb_access.GetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTController2())
-        sb_access.SetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTcontroller1(), 1)
-        sb_access.SetHardwareComponentPosition(sb_access.MicroscopeHardwareComponent().PMTcontroller2(), 1)
         sb_access.SetMagnification(task_set['im']['magnification'])
         #print(sb_access.GetSystemFluorDefs())
 
-    #x = theSbAccess.GetXPosition(0, 0)
+
     print('STARTING RECORDING!!!')
     sb_access.FocusWindowStreamSetNumberFrames(task_set['im']['frames_to_average'])
     capture = sb_access.StartStreaming()

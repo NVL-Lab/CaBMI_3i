@@ -236,20 +236,19 @@ def get_roi_bg_sbaccess_all_pmts(task_set, path_data, sb_access):
 
 def get_roi_bg_sbaccess(task_set, path_data, sb_access):
     frame_limit = int(np.ceil(task_set['im']['fs'] * task_set['im']['time_sec']))
-    roi_channel = np.ceil(task_set['im']['roi_channel'])
+    roi_channel = task_set['im']['roi_channel']
     roi_bg_path = path_data['save_path'] / f'roi_bg_{roi_channel.lower().replace(" ", "")}.npy'
 
-    save = task_set['im']['save'] # need to add
+    save = task_set['im']['save']
     frame_counter = 0
 
-    sb_access.GetMicroscopeState()
     if task_set['im']['xy'] is not None:
         sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().XYZStage, *task_set['im']['xy'])
         sb_access.SetHardwareComponentLocationMicrons(sb_access.MicroscopeHardwareComponent().ZStage, *task_set['im']['z']) # AuxZStage
         sb_access.SetMagnification(task_set['im']['magnification'])
         #print(sb_access.GetSystemFluorDefs())
 
-
+    # Make sure all is set!!!
     print('STARTING RECORDING!!!')
     sb_access.FocusWindowStreamSetNumberFrames(task_set['im']['frames_to_average'])
     capture = sb_access.StartStreaming()
@@ -279,34 +278,43 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
         # Creates a list of numpy arrays to store the image data for each channel
         rows = sb_access.GetNumYRows(capture)
         cols = sb_access.GetNumXColumns(capture)
-        image_data = np.full((frame_limit, rows, cols), np.nan)
+        rec_data = np.empty((frame_limit, rows, cols), np.uint16)
+        image_data = np.empty((rows, cols), np.uint16)
 
+        temp_time_point = 0
         # Assures that the number of frames captured matches the expected number of frames
-        while last_capture < frame_limit:
+        while last_capture < frame_limit: # frame_counter < frame_limit: should be
             prev_capture = last_capture
-            last_capture = sb_access.GetLastImageStreamed(capture)
+            #last_capture = sb_access.GetLastImageStreamed(capture) # skips like 2 or 3
+            #print(last_capture)
+            curr_time_point = sb_access.GetNumTimepoints(capture)
 
             # Captures have to be sequential
-            if last_capture == prev_capture:
+            if temp_time_point == curr_time_point: # last_capture == prev_capture:
                 continue
 
-            image_data[frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), True)
+            temp_time_point = curr_time_point
+            last_capture = curr_time_point - 1
+            print(last_capture) # same thing
+            if sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), image_data):
+                rec_data[frame_counter] = image_data
 
-            if not capturing:
+            if frame_counter > 1:
                 capturing = True
             frame_counter += 1
             print(f'*** Countdown: {frame_limit - frame_counter}')
-            print(f'Elapsed time: {sb_access.GetElapsedTime(capture, last_capture)} msec')  # This is just to ensure that the elapsed time is being updated
+            #print(f'Elapsed time: {sb_access.GetElapsedTime(capture, last_capture)} msec')  # This is just to ensure that the elapsed time is being updated
     finally:
         if streaming:
             sb_access.StopStreaming()
         if save and capturing:
-            np.save(roi_bg_path, image_data, allow_pickle=True)
-            if sb_access.GetIsSlideModified():
-                sb_access.SaveSlide()
-                print(f"{sb_access.ImageName(capture)} saved to {sb_access.GetTargetSlide()}")
+            np.save(roi_bg_path, rec_data, allow_pickle=True)
+            if sb_access.GetIsSlideModified(capture):
+                sb_access.SaveSlide(task_set['slide_id'])
+                print(f"{sb_access.GetImageName(capture)} saved")
 
     print("Streamed successfully!")
+    print(rec_data)
     width, height, um_per_pixel, camera_name, result = sb_access.GetCameraProperties(-1)
 
     print("Properties of acquisition:")

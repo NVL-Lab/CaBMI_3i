@@ -117,7 +117,7 @@ def recording_acqnvs_3i(image_data, frame_limit, task_set, sb_file_reader, image
     channel = task_set['im']['chan_data']['recording_chan']
     frame_counter = 0
     counter_same = 0
-    temp_time_point = 0
+
     frame_interval = 1 / (task_set['im']['frame_rate']*1.2)
     plane_count = sb_file_reader.GetNumZPlanes(capture)
     z_plane = int(plane_count / 2)

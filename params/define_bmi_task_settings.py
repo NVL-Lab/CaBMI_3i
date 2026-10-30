@@ -2,7 +2,7 @@ from typing import Tuple, Dict
 from pathlib import Path
 import math 
 
-def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: str = 'R PMT', save: bool = False) -> Dict:
+def get_bmi_settings(fr: float = 38.0, res: Tuple[int, int] = (403, 390), rec: str = 'R PMT ', save: bool = False) -> Dict:
     return {
         'HOST': 'DESKTOP-M1BJH7O',  # The server's hostname or IP address
         'PORT': 65432,  # Port to listen on (non-privileged ports are > 1023)
@@ -49,7 +49,11 @@ def get_bmi_settings(fr: float = 38.6, res: Tuple[int, int] = (403, 390), rec: s
             #'chan_data': {
             #    'recording_chan': rec # Standard, but subject to change based on microscope operation
             #}
-            'roi_channel': rec
+            'roi_channel': rec,
+            'save': save,
+            'xy': None,          # Position of XY if known
+            'z': None,           # Position of Z if known
+            'magnification': 1     # Magnification to obtain cells
         },
 
         # Regions of Interest (ROIs)

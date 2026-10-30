@@ -27,7 +27,7 @@ def get_exp_info(protocol: str = 'bmi', user: str = None) -> dict:
         exp_info['save_base_dir'] = 'F:/cabmi/bmi_test2'
         if user:
             exp_info['sldy_name'] = (
-                f'{exp_info["date"]}_{exp_info["animal"]}_'
+                f'{exp_info["date"]}T{datetime.now().strftime("%H%M%S")}_{exp_info["animal"]}_'
                 f'{exp_info["experiment"]}_{exp_info["user"]}.sldy'
             )
         else:

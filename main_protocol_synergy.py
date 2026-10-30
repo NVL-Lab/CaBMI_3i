@@ -44,7 +44,7 @@ def confirm(prompt):
 
 def main():
     # Acquire experiment settings
-    exp_info = get_exp_info(user = 'Saul', experiment_type='experiment')
+    exp_info = get_exp_info(user = 'Saul', protocol='bmi')
     task_set = get_bmi_settings(save=True)
     fb_set = get_fb_settings()
 
@@ -98,7 +98,7 @@ def main():
             print("Stopping...")
             return
 
-
+        task_set['slide_id'] = slide_id
         roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
         # Should pass the recording to suite2p rather than creating a mean
         #roi_info = get_roi_data(roi_bg, path_data, task_set, True)

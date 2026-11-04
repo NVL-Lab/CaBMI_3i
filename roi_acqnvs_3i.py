@@ -250,7 +250,7 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
 
     # Make sure all is set!!!
     print('STARTING RECORDING!!!')
-    sb_access.FocusWindowStreamSetNumberFrames(task_set['im']['frames_to_average'])
+    sb_access.FocusWindowStreamSetNumberFrames(task_set['im']['frames_to_average']) # dont think it works
     capture = sb_access.StartStreaming()
     streaming = True
     capturing = False
@@ -278,24 +278,101 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
         # Creates a list of numpy arrays to store the image data for each channel
         rows = sb_access.GetNumYRows(capture)
         cols = sb_access.GetNumXColumns(capture)
+        image_data = np.empty((frame_limit, rows, cols), np.uint16)
+
+        prev_capture = 0
+        # Assures that the number of frames captured matches the expected number of frames
+        while last_capture < frame_limit:
+            # skips like 2 or 3 frames
+            last_capture = sb_access.GetLastImageStreamed(capture) # sb_access.GetNumTimepoints(capture)
+
+            # Captures have to be sequential
+            if last_capture == prev_capture:
+                continue
+
+            prev_capture = last_capture
+            _ = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), image_data[frame_counter])
+
+            #if frame_counter > 1:
+            #    capturing = True
+            frame_counter += 1
+            #print(f'*** Countdown: {frame_limit - frame_counter}')
+            #print(f'Elapsed time: {sb_access.GetElapsedTime(capture, last_capture)} msec')  # This is just to ensure that the elapsed time is being updated
+    finally:
+        if streaming:
+            sb_access.StopStreaming()
+        if save and capturing:
+            np.save(roi_bg_path, image_data, allow_pickle=True)
+            if sb_access.GetIsSlideModified(capture):
+                sb_access.SaveSlide(task_set['slide_id'])
+                #print(f"{sb_access.GetImageName(capture)} saved") # name is blank for some reason, but the slide is saved
+
+
+    print("Streamed successfully!")
+    print(image_data)
+    width, height, um_per_pixel, camera_name, result = sb_access.GetCameraProperties(-1)
+
+    print("Properties of acquisition:")
+    print("Camera Name: ", camera_name)
+    print(f"Camera Resolution: ({width},{height})")
+    print("Microns per pixel: ", um_per_pixel)
+
+    # Crashes slidebook
+    '''
+    print("Lens Name: ", sb_access.GetLensName(capture))
+    print("Magnification: ", sb_access.GetMagnification(capture))
+    
+    n = sb_access.GetNumTimepoints(capture)
+    fps = (n-1) / ((sb_access.GetElapsedTime(capture, n - 1) - sb_access.GetElapsedTime(capture, 0))/1000.0)
+    print("Frame rate: ", fps)
+    '''
+    task_set['im']['capture'] = capture
+    task_set['im']['shape'] = image_data.shape
+
+    return image_data, task_set
+
+'''
+    try:
+        # Assures that the streaming has started and that the first frame has been captured
+        while True:
+            res = sb_access.IsStreaming()
+            last_capture = sb_access.GetLastImageStreamed(capture)
+            if (res and last_capture >= 0):
+                break
+
+        # Assures that the red channel is present in the capture
+        sb_channel_count = sb_access.GetNumChannels(capture)
+        channel_names = [
+            sb_access.GetChannelName(capture, channel_index)
+            for channel_index in range(sb_channel_count)
+        ]
+        if roi_channel not in channel_names:
+            raise RuntimeError(
+                f"'{roi_channel}' not found in SlideBook capture; "
+                f"Available channels: {channel_names}"
+            )
+
+        # Creates a list of numpy arrays to store the image data for each channel
+        rows = sb_access.GetNumYRows(capture)
+        cols = sb_access.GetNumXColumns(capture)
         rec_data = np.empty((frame_limit, rows, cols), np.uint16)
         image_data = np.empty((rows, cols), np.uint16)
 
-        temp_time_point = 0
+        #temp_time_point = 0
         # Assures that the number of frames captured matches the expected number of frames
         while last_capture < frame_limit: # frame_counter < frame_limit: should be
             prev_capture = last_capture
-            #last_capture = sb_access.GetLastImageStreamed(capture) # skips like 2 or 3
-            #print(last_capture)
-            curr_time_point = sb_access.GetNumTimepoints(capture)
+            last_capture = sb_access.GetLastImageStreamed(capture) # skips like 2 or 3
+
+            #last_capture = sb_access.GetNumTimepoints(capture)
 
             # Captures have to be sequential
-            if temp_time_point == curr_time_point: # last_capture == prev_capture:
+            if last_capture == prev_capture:
                 continue
 
-            temp_time_point = curr_time_point
-            last_capture = curr_time_point - 1
-            print(last_capture) # same thing
+            #temp_time_point = curr_time_point
+            #last_capture = curr_time_point# - 1
+            print('capture:', last_capture) # same thing
             if sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), image_data):
                 rec_data[frame_counter] = image_data
 
@@ -312,23 +389,4 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
             if sb_access.GetIsSlideModified(capture):
                 sb_access.SaveSlide(task_set['slide_id'])
                 print(f"{sb_access.GetImageName(capture)} saved")
-
-    print("Streamed successfully!")
-    print(rec_data)
-    width, height, um_per_pixel, camera_name, result = sb_access.GetCameraProperties(-1)
-
-    print("Properties of acquisition:")
-    print("Camera Name: ", camera_name)
-    print(f"Camera Resolution: ({width},{height})")
-    print("Microns per pixel: ", um_per_pixel)
-    print("Lens Name: ", sb_access.GetLensName(capture))
-    print("Magnification: ", sb_access.GetMagnification(capture))
-
-    n = sb_access.GetNumTimepoints(capture)
-    fps = (n-1) / ((sb_access.GetElapsedTime(capture, n - 1) - sb_access.GetElapsedTime(capture, 0))/1000.0)
-    print("Frame rate: ", fps)
-
-    task_set['im']['capture'] = capture
-    task_set['im']['shape'] = image_data.shape
-
-    return image_data, task_set
+'''

@@ -102,7 +102,7 @@ def main():
         roi_bg, task_set = get_roi_bg_sbaccess(task_set, path_data, sb_access)
         # Should pass the recording to suite2p rather than creating a mean
         #roi_info = get_roi_data(roi_bg, path_data, task_set, True)
-        sb_access.CloseSlide(sb_access.GetTargetSlide(), True) # slide_id should be the same as sb_access.GetTargetSlide()
+        sb_access.CloseSlide(slide_id, True) # slide_id should be the same as sb_access.GetTargetSlide()
         s.close()
         exit()
 

@@ -163,76 +163,33 @@ def get_roi_data(image_data, path_data, task_set, plot=False, run=''):
 
     return roi_info
 
-def get_roi_bg_sbaccess_all_pmts(task_set, path_data, sb_access):
-    frame_limit = 100
-    frame_counter = 0
-    channel_count = 2
-    sb_rec_frames = 1  # The number of frames Slidebook will record per acquisition.
-    save = True
-    print('STARTING RECORDING!!!')
-    sb_access.FocusWindowStreamSetNumberFrames(sb_rec_frames)
-    capture = sb_access.StartStreaming()
-    streaming = True
+def get_roi_bg_test(task_set, path_data, run=''):
+    """
+        Records region of interest and extracts the regions of interest (ROIs)
 
-    try:
-        # Assures that the streaming has started and that the first frame has been captured
-        while True:
-            res = sb_access.IsStreaming()
-            last_capture = sb_access.GetLastImageStreamed(capture)
-            if (res and last_capture >= 0):
-                break
+        Parameters:
+            task_set: dictionary with bmi parameters
+            path_data: paths to experiment data
+            capture: integer denoting the desired capture within 3i .sldy file
+            channel: type of channel
+            roi_chan_data: list with channel and ROI data
+            see_roi_data_flag: bool used to determine if ROIs should be plotted
+            run: bool used to determine if the code should be run (typically ran unless code has been ran already)
 
-        # Assures that the number of channels in the capture matches the expected number of channels
-        sb_channel_count = sb_access.GetNumChannels(capture)
-        if sb_channel_count != channel_count:
-            raise RuntimeError(
-                "Incorrect number of channels; "
-                f"Expected {channel_count}, got {sb_channel_count}"
-            )
+        Returns:
+            test_info: dictionary containing dataframes with voltage data.
+    """
+    frame_limit = int(np.ceil(task_set['im']['fs'] * task_set['im']['time_sec']))
+    roi_channel = task_set['im']['roi_channel']
+    roi_bg_path = path_data['save_path'] / f'roi_bg_{roi_channel.lower().replace(" ", "")}.npy'
 
-        # Creates a list of numpy arrays to store the image data for each channel
-        rows = sb_access.GetNumYRows(capture)
-        cols = sb_access.GetNumXColumns(capture)
-        # image_data = [np.full((frame_limit, rows, cols), np.nan) for _ in range(sb_channel_count)]
-        image_data = {sb_access.GetChannelName(capture, channel_index).lower().replace(" ", ""): np.full(
-            (frame_limit, rows, cols), np.nan) for channel_index in range(sb_channel_count)}
-        channel_names = image_data.keys()
-        capture_indexes = []
+    print(f'ROI recording will consist of {task_set["roi"]["recording_frames"]} frames')
 
-        # Assures that the number of frames captured matches the expected number of frames
-        while last_capture < frame_limit:
-            prev_capture = last_capture
-            last_capture = sb_access.GetLastImageStreamed(capture)
+    # Creates an instance of slidebook reader
+    sb_file_reader, capture = wait_for_reader_with_latest_capture(path_data['sldy_path'])
+    task_set = get_recording_settings(sb_file_reader, task_set['roi']['capture'], task_set)
 
-            # Captures have to be sequential
-            if last_capture == prev_capture:
-                continue
-            capture_indexes.append(last_capture)
-            # just take into account the red channel and gather the corresponding green channel data for the same frame
-            if 'rpmt' in channel_names:
-                image_data['rpmt'][frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0,
-                                                                                channel_names.index('rpmt'), True)
-            else:
-                raise RuntimeError(
-                    "Channel 'rpmt' not found in SlideBook capture; "
-                    f"Available channels: {channel_names}"
-                )
-            # Need to make sure capture of each frame is the same, otherwise, the frame counter will be off and the data will be misaligned
-            # for channel_index in range(sb_channel_count):
-            #    image_data[channel_index][frame_counter] = sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_index,True)
-            frame_counter += 1
-            print(f'*** Countdown: {frame_limit - frame_counter}')
 
-    except KeyboardInterrupt:
-        print('Keyboard Interrupt')
-    finally:
-        if save:
-            for channel_index in range(sb_channel_count):
-                np.save(path_data[
-                            'save_path'] / f'roi_bg_{sb_access.GetChannelName(capture, channel_index).lower().replace(" ", "")}.npy',
-                        image_data[channel_index], allow_pickle=True)
-        if streaming:
-            sb_access.StopStreaming()
 
 def get_roi_bg_sbaccess(task_set, path_data, sb_access):
     frame_limit = int(np.ceil(task_set['im']['fs'] * task_set['im']['time_sec']))
@@ -330,63 +287,3 @@ def get_roi_bg_sbaccess(task_set, path_data, sb_access):
     task_set['im']['shape'] = image_data.shape
 
     return image_data, task_set
-
-'''
-    try:
-        # Assures that the streaming has started and that the first frame has been captured
-        while True:
-            res = sb_access.IsStreaming()
-            last_capture = sb_access.GetLastImageStreamed(capture)
-            if (res and last_capture >= 0):
-                break
-
-        # Assures that the red channel is present in the capture
-        sb_channel_count = sb_access.GetNumChannels(capture)
-        channel_names = [
-            sb_access.GetChannelName(capture, channel_index)
-            for channel_index in range(sb_channel_count)
-        ]
-        if roi_channel not in channel_names:
-            raise RuntimeError(
-                f"'{roi_channel}' not found in SlideBook capture; "
-                f"Available channels: {channel_names}"
-            )
-
-        # Creates a list of numpy arrays to store the image data for each channel
-        rows = sb_access.GetNumYRows(capture)
-        cols = sb_access.GetNumXColumns(capture)
-        rec_data = np.empty((frame_limit, rows, cols), np.uint16)
-        image_data = np.empty((rows, cols), np.uint16)
-
-        #temp_time_point = 0
-        # Assures that the number of frames captured matches the expected number of frames
-        while last_capture < frame_limit: # frame_counter < frame_limit: should be
-            prev_capture = last_capture
-            last_capture = sb_access.GetLastImageStreamed(capture) # skips like 2 or 3
-
-            #last_capture = sb_access.GetNumTimepoints(capture)
-
-            # Captures have to be sequential
-            if last_capture == prev_capture:
-                continue
-
-            #temp_time_point = curr_time_point
-            #last_capture = curr_time_point# - 1
-            print('capture:', last_capture) # same thing
-            if sb_access.ReadImagePlaneBuf(capture, 0, last_capture, 0, channel_names.index(roi_channel), image_data):
-                rec_data[frame_counter] = image_data
-
-            if frame_counter > 1:
-                capturing = True
-            frame_counter += 1
-            print(f'*** Countdown: {frame_limit - frame_counter}')
-            #print(f'Elapsed time: {sb_access.GetElapsedTime(capture, last_capture)} msec')  # This is just to ensure that the elapsed time is being updated
-    finally:
-        if streaming:
-            sb_access.StopStreaming()
-        if save and capturing:
-            np.save(roi_bg_path, rec_data, allow_pickle=True)
-            if sb_access.GetIsSlideModified(capture):
-                sb_access.SaveSlide(task_set['slide_id'])
-                print(f"{sb_access.GetImageName(capture)} saved")
-'''
